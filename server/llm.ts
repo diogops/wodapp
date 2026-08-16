@@ -6,6 +6,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { ENV } from "./_core/env";
+import { ocrPdfToMarkdown } from "./ocr";
 
 const exerciseProperties = {
   name: { type: "string" },
@@ -68,7 +69,27 @@ function getClient() {
   return _client;
 }
 
+/**
+ * Dois estágios quando o OCR está disponível: o Mistral transcreve o PDF em
+ * markdown e a Anthropic estrutura esse texto no schema. Sem OCR, o PDF vai
+ * inteiro para a Anthropic, que o lê nativamente. O segundo caminho continua
+ * correto — o primeiro é mais barato e lida melhor com página escaneada.
+ */
 export async function extractWorkoutFromPdf(pdfBase64: string): Promise<unknown> {
+  const markdown = await ocrPdfToMarkdown(pdfBase64);
+
+  const userContent: Anthropic.ContentBlockParam[] = markdown
+    ? [
+        {
+          type: "text",
+          text: `Conteúdo do PDF transcrito por OCR:\n\n${markdown}\n\nConverta para o schema solicitado.`,
+        },
+      ]
+    : [
+        { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
+        { type: "text", text: "Converta este PDF para o schema solicitado." },
+      ];
+
   const response = await getClient().messages.create({
     model: ENV.anthropicModel,
     max_tokens: 16000,
@@ -77,15 +98,7 @@ export async function extractWorkoutFromPdf(pdfBase64: string): Promise<unknown>
       effort: "medium",
       format: { type: "json_schema", schema: WORKOUT_JSON_SCHEMA },
     },
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
-          { type: "text", text: "Converta este PDF para o schema solicitado." },
-        ],
-      },
-    ],
+    messages: [{ role: "user", content: userContent }],
   });
 
   if (response.stop_reason === "refusal") {

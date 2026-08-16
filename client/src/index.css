@@ -302,6 +302,34 @@ button:focus-visible,
     padding-inline: 0.35rem;
   }
 
+  /* Distribuição do espaço que sobra.
+     Quando o treino é curto, o excedente ia todo para uma faixa vazia acima do
+     rodapé. Aqui ele é repartido entre as linhas de exercício (com teto, para
+     um workout de 2 linhas não virar texto flutuando no meio da tela). Quando
+     o conteúdo estoura a altura, flex-grow não tem efeito e a rolagem interna
+     do corpo assume — o contrato de "só o corpo rola" continua valendo. */
+  .workout-mode .workout-card-body {
+    display: flex;
+    flex-direction: column;
+  }
+  .workout-mode .workout-card-body > section {
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 auto;
+  }
+  .workout-mode .workout-card-body > section > div:first-child,
+  .workout-mode .workout-card-body > section > .workout-notes,
+  .workout-mode .workout-card-body > .workout-notes {
+    flex: 0 0 auto;
+  }
+  .workout-mode .workout-exercise-row {
+    display: flex;
+    flex: 1 0 auto;
+    max-height: 3.4rem;
+    flex-direction: column;
+    justify-content: center;
+  }
+
   /* Observações acompanham a tipografia da prescrição do exercício. */
   .workout-mode .workout-notes {
     font-size: 0.68rem;

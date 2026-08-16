@@ -10,4 +10,7 @@ export const ENV = {
   ownerGithubLogin: process.env.OWNER_GITHUB_LOGIN ?? "",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
   anthropicModel: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
+  // OCR opcional: sem a chave, a importação usa o PDF nativo da Anthropic.
+  mistralApiKey: process.env.MISTRAL_API_KEY ?? "",
+  mistralOcrModel: process.env.MISTRAL_OCR_MODEL ?? "mistral-ocr-latest",
 };

@@ -6,6 +6,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { createWorkout, deleteWorkout, ensureDefaultWorkouts, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, recordSession, updateWorkoutOrder } from "./db";
 import { storagePut } from "./storage";
 import { extractWorkoutFromPdf } from "./llm";
+import { buildWorkoutPdf } from "./workoutPdf";
 
 const exerciseSchema = z.object({ name: z.string(), prescription: z.string().optional(), sets: z.string().optional(), reps: z.string().optional(), duration: z.string().optional(), load: z.string().optional(), notes: z.string().optional() });
 const sectionSchema = z.object({ title: z.string(), format: z.string().optional(), notes: z.string().optional(), exercises: z.array(exerciseSchema).default([]) });
@@ -30,6 +31,20 @@ export const appRouter = router({
       return created;
     }),
     remove: protectedProcedure.input(z.object({ id: z.number() })).mutation(({ ctx, input }) => deleteWorkout(ctx.user.id, input.id)),
+    exportPdf: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const workout = await getWorkoutForUser(ctx.user.id, input.id);
+      if (!workout) throw new Error("Workout não encontrado");
+      const pdf = await buildWorkoutPdf(workout);
+      // Acentos viram ASCII antes de virar nome de arquivo: "Força" -> "forca".
+      const slug = workout.title
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase();
+      const filename = `${slug || "workout"}.pdf`;
+      return { filename, base64: pdf.toString("base64") };
+    }),
     reorder: protectedProcedure.input(z.object({ ids: z.array(z.number()) })).mutation(({ ctx, input }) => updateWorkoutOrder(ctx.user.id, input.ids)),
     session: protectedProcedure.input(z.object({ id: z.number(), action: z.enum(["completed", "skipped"]) })).mutation(async ({ ctx, input }) => {
       const workout = await getWorkoutForUser(ctx.user.id, input.id);

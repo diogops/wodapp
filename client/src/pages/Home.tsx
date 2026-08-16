@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Download,
   Dumbbell,
   FileUp,
   Github,
@@ -22,6 +23,7 @@ import {
   Plus,
   SkipForward,
   Sparkles,
+  Timer as TimerIcon,
   Trash2,
   X,
   ArrowUp,
@@ -31,6 +33,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { chooseRandomWorkoutIndex } from "@/lib/workoutSelection";
 import { getWorkoutDemoState, getWorkoutShellClass } from "@/lib/workoutMode";
+import {
+  buildAndroidTimerIntent,
+  formatTimerDisplay,
+  getTimerClickAction,
+  isAndroid,
+  parseDurationToSeconds,
+  type TimerStatus,
+} from "@/lib/workoutTimer";
 
 type Tab = "today" | "library" | "history";
 
@@ -51,6 +61,36 @@ const EXERCISE_DEMOS: Record<string, string> = {
   transição: "/demos/exercise-pvc-transition_0974dc02.png",
   generic: "/demos/exercise-generic-movement_6c9cf380.png",
 };
+
+/**
+ * Aviso de fim de timer. Vibração e áudio são independentes de propósito: no
+ * celular no bolso a vibração é o que se percebe, e num navegador que bloqueia
+ * autoplay o áudio pode simplesmente não sair. Nenhum dos dois pode derrubar
+ * o app, então ambos falham em silêncio.
+ */
+function signalTimerEnd() {
+  try {
+    navigator.vibrate?.([300, 150, 300, 150, 500]);
+  } catch {}
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    [0, 0.45, 0.9].forEach(offset => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.001, ctx.currentTime + offset);
+      gain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.3);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + offset);
+      osc.stop(ctx.currentTime + offset + 0.32);
+    });
+    window.setTimeout(() => ctx.close().catch(() => {}), 1600);
+  } catch {}
+}
 
 function getExerciseDemo(name: string) {
   const normalized = name.trim().toLowerCase();
@@ -132,6 +172,23 @@ export default function Home() {
     },
   });
   const reorder = trpc.workouts.reorder.useMutation({ onSuccess: refresh });
+  const exportPdf = trpc.workouts.exportPdf.useMutation({
+    onSuccess: result => {
+      // Sem endpoint de download direto: o PDF chega em base64 pelo tRPC e vira
+      // um blob local, o que evita expor uma rota de arquivo sem sessão.
+      const bytes = Uint8Array.from(atob(result.base64), char => char.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = result.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success("PDF gerado");
+    },
+    onError: error => toast.error(error.message),
+  });
   const importPdf = trpc.workouts.importPdf.useMutation({
     onSuccess: result => {
       setPendingImport(result.workout);
@@ -283,6 +340,7 @@ export default function Home() {
             onSession={(action: "completed" | "skipped") =>
               current && session.mutate({ id: current.id, action })
             }
+            loading={workoutsQuery.isLoading || historyQuery.isLoading}
           />
         )}
         {tab === "library" && (
@@ -298,6 +356,8 @@ export default function Home() {
               setSelectedIndex(index);
               setTab("today");
             }}
+            onExportPdf={(id: number) => exportPdf.mutate({ id })}
+            exportingId={exportPdf.isPending ? exportPdf.variables?.id : undefined}
           />
         )}
         {tab === "history" && <History items={history} />}
@@ -356,6 +416,8 @@ function Landing() {
   );
 }
 
+type ActiveTimer = { label: string; total: number; remaining: number; status: TimerStatus; hidden?: boolean };
+
 function Today({
   workouts,
   current,
@@ -365,8 +427,65 @@ function Today({
   completedIds,
   onExit,
   onSession,
+  loading,
 }: any) {
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
+  const [timer, setTimer] = useState<ActiveTimer | null>(null);
+
+  useEffect(() => {
+    if (!timer || timer.status !== "running") return;
+    const id = window.setInterval(() => {
+      setTimer(prev => {
+        if (!prev || prev.status !== "running") return prev;
+        const remaining = prev.remaining - 1;
+        if (remaining > 0) return { ...prev, remaining };
+        signalTimerEnd();
+        return { ...prev, remaining: 0, status: "finished" };
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [timer?.status, timer?.label]);
+
+  // Tenta o relógio do sistema primeiro (só o Android expõe isso para a web).
+  // Se a página continuar visível depois do intent, ele não foi atendido e o
+  // timer interno assume — que é o caminho normal no iOS e no desktop.
+  const startTimer = (label: string, seconds: number) => {
+    const fallback = () => setTimer({ label, total: seconds, remaining: seconds, status: "running" });
+
+    if (isAndroid(navigator.userAgent)) {
+      window.location.href = buildAndroidTimerIntent(seconds, label);
+      window.setTimeout(() => {
+        if (document.visibilityState === "visible") fallback();
+      }, 1200);
+      return;
+    }
+    fallback();
+  };
+
+  // Um toque fecha. Se ainda havia tempo, o timer é pausado e continua
+  // disponível para retomar — um toque acidental no meio do treino não pode
+  // custar a contagem. Se já terminou, some de vez.
+  const onTimerClick = () => {
+    setTimer(prev => {
+      if (!prev) return null;
+      if (getTimerClickAction(prev.status) === "close") return null;
+      return { ...prev, status: "paused", hidden: true };
+    });
+  };
+
+  const resumeTimer = () =>
+    setTimer(prev => (prev ? { ...prev, status: "running", hidden: false } : prev));
+  // "Sem workout" e "ainda carregando" são estados diferentes. Mostrar o vazio
+  // durante o carregamento dizia ao usuário logado que ele não tem treinos.
+  if (!current && loading)
+    return (
+      <Card className="border-dashed bg-white/50">
+        <CardContent className="grid place-items-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-[#e06b3c]" />
+          <p className="mt-3 text-sm text-[#6d746a]">Carregando seu treino…</p>
+        </CardContent>
+      </Card>
+    );
   if (!current)
     return (
       <Card className="border-dashed bg-white/50 p-10 text-center">
@@ -455,6 +574,24 @@ function Today({
                               .join(" · ")}
                         </p>
                       </div>
+                      {(() => {
+                        const seconds = parseDurationToSeconds(exercise.duration, exercise.prescription);
+                        if (!seconds) return null;
+                        const isPaused = timer?.label === exercise.name && timer?.status === "paused";
+                        return (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="workout-exercise-timer shrink-0 px-2 text-xs font-semibold text-[#20231f] hover:bg-[#e9eae2]"
+                            aria-label={`${isPaused ? "Retomar" : "Iniciar"} timer de ${formatTimerDisplay(seconds)} para ${exercise.name}`}
+                            onClick={() => (isPaused ? resumeTimer() : startTimer(exercise.name, seconds))}
+                          >
+                            <TimerIcon className="mr-1 h-3.5 w-3.5" />
+                            {isPaused ? "Retomar" : "Iniciar"}
+                          </Button>
+                        );
+                      })()}
                       {getExerciseDemo(exercise.name) ? (
                         <Button
                           type="button"
@@ -555,6 +692,30 @@ function Today({
           </CardContent>
         </Card>
       </aside>
+      {timer && !timer.hidden && (
+        <div
+          className="fixed inset-0 z-[80] grid place-items-center bg-[#20231f]/80 p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Timer de ${timer.label}`}
+          onClick={onTimerClick}
+        >
+          <div className="text-center text-[#f7f7f2]">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#f29a73]">
+              {timer.status === "finished" ? "Tempo encerrado" : timer.label}
+            </p>
+            <p
+              className="font-display text-[22vw] font-semibold leading-none tabular-nums sm:text-[9rem]"
+              aria-live="polite"
+            >
+              {formatTimerDisplay(timer.remaining)}
+            </p>
+            <p className="mt-4 text-sm text-[#bfc7ba]">
+              {timer.status === "finished" ? "Toque para fechar" : "Toque para pausar e fechar"}
+            </p>
+          </div>
+        </div>
+      )}
       {expandedExerciseData && getExerciseDemo(expandedExerciseData.name) && (
         <div className={`${demoState.modalClass} grid place-items-center bg-[#20231f]/70 p-4`} role="presentation" onClick={() => setExpandedExercise(null)}>
           <div className="max-h-[80dvh] w-full max-w-sm overflow-y-auto rounded-3xl bg-[#f7f7f2] p-4 shadow-2xl" role="dialog" aria-modal="true" aria-label={`Demonstração de ${expandedExerciseData.name}`} onClick={(event) => event.stopPropagation()}>
@@ -577,7 +738,7 @@ function Today({
   );
 }
 
-function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect }: any) {
+function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, onExportPdf, exportingId }: any) {
   return (
     <div className="space-y-3">
       {workouts.map((workout: any, index: number) => (
@@ -602,6 +763,19 @@ function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect }:
                   : dateLabel(workout.suggestedDate)}
               </Badge>
               <Button variant="outline" size="sm" onClick={() => onEdit(workout)}>Editar</Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onExportPdf(workout.id)}
+                disabled={exportingId === workout.id}
+                aria-label={`Baixar ${workout.title} em PDF`}
+              >
+                {exportingId === workout.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
