@@ -1,0 +1,18 @@
+Achados da análise do PDF workouts_crossfit_chacara.pdf
+
+1. O PDF contém 4 workouts independentes, identificados como Workout A, B, C e D.
+2. Cada workout tem um título principal, um texto curto de foco/objetivo e uma sequência de blocos ou seções numeradas.
+3. As seções variam de formato: técnica, WOD, finisher, cardio, core, EMOM e blocos de força/habilidade.
+4. Dentro de cada seção, o conteúdo é apresentado como texto estruturado por linhas com rounds, repetições, tempo, carga, observações e escalas.
+5. Há campos textuais complementares importantes, como objetivo, opção, regra de intensidade, escala, controle, progressão e observações técnicas.
+6. O modelo de dados precisa suportar workout -> blocos/seções -> itens/linhas de exercício, além de notas livres por seção.
+7. A interface ideal deve privilegiar leitura rápida em celular: um card principal por workout, com blocos expansíveis ou empilhados por seção.
+8. A importação por LLM deve aceitar PDFs semi-estruturados e produzir JSON padronizado com: título, foco, nível opcional, data sugerida opcional, seções, exercícios/linhas e observações.
+9. O histórico de execução deve registrar pelo menos workoutId, timestamp, ação (completed/skipped) e snapshot textual do workout para auditoria futura.
+10. O fluxo de navegação deve permitir seguir a sequência automática, mas também navegar manualmente entre workouts e reordenar a fila.
+
+11. Workouts reais identificados para seed inicial:
+- Workout A - Double Under + Engine. Foco: técnica de corda, coordenação e condicionamento. Blocos: Técnica 12 min; Depois EMOM 5; WOD AMRAP 15; Finisher Bike 8 min.
+- Workout B - Base para BMU / RMU. Foco: hollow, arch, core, empurrada, dip e memória motora. Blocos: Hollow/Arch 4 rounds; Hollow Rocks; Push-up Strength; Paralelas 4 rounds; Transição simulada com cano/PVC.
+- Workout C - Engine / Base Aeróbica. Foco: construir motor sem transformar tudo em WOD. Blocos: Cardio 30 min; Core 3 rounds; com opção, regra de intensidade e objetivo do dia.
+- Workout D - Skill sob fadiga. Foco: manter coordenação e técnica com frequência cardíaca elevada. Blocos: EMOM 20 com 5 movimentos x 4 rounds; ponto principal; controle; progressão.

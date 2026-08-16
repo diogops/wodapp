@@ -1,0 +1,13 @@
+export const ENV = {
+  appUrl: process.env.APP_URL ?? "",
+  cookieSecret: process.env.JWT_SECRET ?? "",
+  databaseUrl: process.env.DATABASE_URL ?? "",
+  isProduction: process.env.NODE_ENV === "production",
+  storageDir: process.env.STORAGE_DIR ?? ".storage",
+  // GitHub OAuth substituiu o OAuth da Manus. O app é pessoal: só o dono entra.
+  githubClientId: process.env.GITHUB_CLIENT_ID ?? "",
+  githubClientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+  ownerGithubLogin: process.env.OWNER_GITHUB_LOGIN ?? "",
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  anthropicModel: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
+};
