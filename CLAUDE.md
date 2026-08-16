@@ -33,13 +33,46 @@ pnpm vitest run -t "imports PDF into a reviewable"
 
 **Windows note:** `pnpm dev` and `pnpm start` use the POSIX form `NODE_ENV=... tsx ...`, which PowerShell cannot parse. Run them from the Bash tool, or set `$env:NODE_ENV` and invoke `pnpm exec tsx watch server/_core/index.ts` directly.
 
-Railway operations use the `railway` CLI (authenticated as `diogops@gmail.com`):
+## Deploying
+
+Publishing is: **verify → build → commit → push → `railway up` → poll until SUCCESS.** Skipping the poll is the most common way to report a deploy that never landed.
 
 ```bash
-railway up --detach --service workout-app     # deploy; poll `railway deployment list` for SUCCESS
-railway logs --service workout-app
-railway variable set KEY=value --service workout-app
+pnpm check && pnpm test && pnpm build
+git add -A && git commit && git push origin main
+railway up --detach --service workout-app -m "<summary>"
+
+# railway up returns while the build is still QUEUED. Poll until terminal:
+railway deployment list --service workout-app --json     # read [0].status
+
+# Only after SUCCESS, confirm for real:
+curl -s https://workout-app-production-a38f.up.railway.app/health   # {"ok":true}
+railway logs --service workout-app                                  # "Server running on port 8080"
 ```
+
+`BUILDING → DEPLOYING → SUCCESS` takes roughly 45–90s.
+
+**Migrations run at boot**, in `runMigrations()` before `listen()` — Railway's Postgres is reachable only on the internal network, so there is nowhere else to apply them. A failed migration means the container never starts, which makes `"Server running on port 8080"` the proof that migrations applied. To create one, note that `drizzle.config.ts` throws without `DATABASE_URL` even though generation never connects, so pass a throwaway value:
+
+```bash
+DATABASE_URL="postgresql://x:x@localhost:5432/x" pnpm exec drizzle-kit generate
+```
+
+Commit the generated `.sql` **and** `drizzle/migrations/meta/` — the running app reads them from the repo.
+
+**The GitHub repo is public.** `.env` and `.project-config.json` are gitignored and must stay so; Railway holds the real values (`DATABASE_URL` is the reference `${{Postgres.DATABASE_URL}}`, not a literal). Before a push that touches config:
+
+```bash
+git ls-files -z | xargs -0 grep -lIE "sk-ant-|gho_|ghp_|postgres(ql)?://[^ ]*:[^ ]*@"
+```
+
+Setting a variable redeploys unless you pass `--skip-deploys`:
+
+```bash
+railway variable set KEY=value --service workout-app [--skip-deploys]
+```
+
+**Local environment traps** (these are machine-specific, not repo problems): `pnpm` is not on PATH — use `npx pnpm`, and don't retry `corepack enable`, which fails with `EPERM` without admin. Local Node is 20.18.1 while `package.json` requires ≥22.12, so every command prints `Unsupported engine`; that warning is expected and the build still works. `pnpm dev` / `pnpm start` use the POSIX `NODE_ENV=… ` prefix that PowerShell cannot parse — run them from bash. And after editing `tsconfig.json`, delete `node_modules/typescript/tsbuildinfo` before trusting a clean `pnpm check`: the incremental cache silently hides errors.
 
 ## Environment
 
