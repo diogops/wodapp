@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SurpriseWodDialog } from "@/components/SurpriseWodDialog";
 import { trpc } from "@/lib/trpc";
 import {
   Check,
@@ -109,6 +110,7 @@ export default function Home() {
   const [tab, setTab] = useState<Tab>("today");
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [showCreate, setShowCreate] = useState(false);
+  const [showSurprise, setShowSurprise] = useState(false);
   const [editingWorkout, setEditingWorkout] = useState<any>(null);
   const [pendingImport, setPendingImport] = useState<any>(null);
   const [newWorkout, setNewWorkout] = useState({
@@ -186,6 +188,16 @@ export default function Home() {
       link.remove();
       URL.revokeObjectURL(url);
       toast.success("PDF gerado");
+    },
+    onError: error => toast.error(error.message),
+  });
+  // Cai no mesmo rascunho do import de PDF: o workout gerado é revisado e
+  // editado antes de entrar na fila, nunca salvo direto.
+  const generate = trpc.workouts.generate.useMutation({
+    onSuccess: result => {
+      setShowSurprise(false);
+      setPendingImport(result.workout);
+      toast.success("Workout gerado. Revise antes de salvar.");
     },
     onError: error => toast.error(error.message),
   });
@@ -271,11 +283,15 @@ export default function Home() {
               burocracia.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               className="bg-[#e06b3c] text-white hover:bg-[#c8562c]"
-              onClick={() => setShowCreate(true)}
+              onClick={() => setShowSurprise(true)}
             >
+              <Sparkles className="mr-2 h-4 w-4" />
+              WOD surpresa
+            </Button>
+            <Button variant="outline" onClick={() => setShowCreate(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Novo workout
             </Button>
@@ -361,6 +377,13 @@ export default function Home() {
           />
         )}
         {tab === "history" && <History items={history} />}
+        {showSurprise && (
+          <SurpriseWodDialog
+            busy={generate.isPending}
+            onClose={() => setShowSurprise(false)}
+            onGenerate={selection => generate.mutate(selection)}
+          />
+        )}
         {(showCreate || editingWorkout || pendingImport) && (
           <CreateWorkout
             value={editingWorkout || pendingImport || newWorkout}

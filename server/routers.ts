@@ -5,7 +5,8 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { createWorkout, deleteWorkout, ensureDefaultWorkouts, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, recordSession, updateWorkoutOrder } from "./db";
 import { storagePut } from "./storage";
-import { extractWorkoutFromPdf } from "./llm";
+import { isCatalogExercise, isFocusArea } from "@shared/exerciseCatalog";
+import { extractWorkoutFromPdf, generateWorkout } from "./llm";
 import { buildWorkoutPdf } from "./workoutPdf";
 
 const exerciseSchema = z.object({ name: z.string(), prescription: z.string().optional(), sets: z.string().optional(), reps: z.string().optional(), duration: z.string().optional(), load: z.string().optional(), notes: z.string().optional() });
@@ -51,6 +52,25 @@ export const appRouter = router({
       if (!workout) throw new Error("Workout não encontrado");
       return recordSession(ctx.user.id, input.id, input.action, JSON.stringify(workout));
     }),
+    generate: protectedProcedure
+      .input(z.object({
+        // Só nomes do catálogo: aceitar texto livre aqui deixaria o usuário
+        // dirigir o prompt do gerador.
+        exercises: z.array(z.string()).max(30).default([]).transform(list => list.filter(isCatalogExercise)),
+        focusAreas: z.array(z.string()).max(14).default([]).transform(list => list.filter(isFocusArea)),
+        notes: z.string().max(500).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const existing = await getWorkoutsForUser(ctx.user.id);
+        const generated = await generateWorkout({
+          exercises: input.exercises,
+          focusAreas: input.focusAreas,
+          notes: input.notes,
+          avoidTitles: existing.map(workout => workout.title).slice(0, 12),
+        });
+        // Mesmo contrato do import de PDF: devolve rascunho para revisão, não persiste.
+        return { workout: workoutSchema.parse(generated) };
+      }),
     importPdf: protectedProcedure.input(z.object({ filename: z.string(), mimeType: z.string().default("application/pdf"), base64: z.string() })).mutation(async ({ ctx, input }) => {
       const bytes = Buffer.from(input.base64, "base64");
       const uploaded = await storagePut(`${ctx.user.id}-workouts/${Date.now()}-${input.filename.replace(/[^a-zA-Z0-9._-]/g, "-")}`, bytes, input.mimeType);

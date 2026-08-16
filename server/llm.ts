@@ -52,6 +52,14 @@ const WORKOUT_JSON_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+const GENERATOR_SYSTEM_PROMPT = [
+  "Você é um treinador de CrossFit montando um workout para um atleta intermediário treinando sozinho.",
+  "Monte uma sessão coerente e executável, com aquecimento/técnica quando fizer sentido, parte principal e finisher quando couber.",
+  "Prescreva volume, tempo e carga concretos — nada de 'a critério'. Use kg para carga e escreva tudo em português.",
+  "Respeite os pedidos do atleta: se ele listou exercícios, use-os como espinha dorsal; se listou o que quer trabalhar, o estímulo tem que refletir isso.",
+  "Você pode acrescentar movimentos complementares para a sessão fazer sentido, mas não troque o foco pedido por outro.",
+].join(" ");
+
 const SYSTEM_PROMPT = [
   "Você é um treinador e parser de workouts.",
   "Extraia o conteúdo do PDF para JSON estrito em português, sem inventar dados.",
@@ -114,5 +122,61 @@ export async function extractWorkoutFromPdf(pdfBase64: string): Promise<unknown>
     .join("");
 
   if (!text.trim()) throw new Error("O modelo não retornou conteúdo para este PDF");
+  return JSON.parse(text);
+}
+
+export type GenerateWorkoutInput = {
+  exercises: string[];
+  focusAreas: string[];
+  notes?: string;
+  avoidTitles?: string[];
+};
+
+/**
+ * Gera um workout novo. Sem seleção alguma o pedido vira "surpresa" — é o
+ * caminho de quem só quer treinar sem decidir nada.
+ */
+export async function generateWorkout(input: GenerateWorkoutInput): Promise<unknown> {
+  const brief: string[] = [];
+
+  brief.push(
+    input.exercises.length
+      ? `Exercícios que o atleta escolheu: ${input.exercises.join(", ")}.`
+      : "O atleta não escolheu exercícios específicos."
+  );
+  brief.push(
+    input.focusAreas.length
+      ? `O que ele quer trabalhar: ${input.focusAreas.join(", ")}.`
+      : "Ele não indicou um foco específico — escolha um estímulo coerente."
+  );
+  if (input.notes?.trim()) brief.push(`Observações do atleta: ${input.notes.trim()}`);
+  if (input.avoidTitles?.length) {
+    // Sem isto, "surpresa" tende a devolver variações do mesmo workout.
+    brief.push(
+      `Evite repetir o estímulo destes workouts que ele já tem na fila: ${input.avoidTitles.join("; ")}.`
+    );
+  }
+  brief.push("Monte o workout no schema solicitado.");
+
+  const response = await getClient().messages.create({
+    model: ENV.anthropicModel,
+    max_tokens: 16000,
+    system: GENERATOR_SYSTEM_PROMPT,
+    output_config: {
+      effort: "medium",
+      format: { type: "json_schema", schema: WORKOUT_JSON_SCHEMA },
+    },
+    messages: [{ role: "user", content: brief.join("\n") }],
+  });
+
+  if (response.stop_reason === "refusal") throw new Error("O modelo recusou montar este workout");
+  if (response.stop_reason === "max_tokens") throw new Error("O workout gerado ficou longo demais");
+
+  const text = response.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map(block => block.text)
+    .join("");
+
+  if (!text.trim()) throw new Error("O modelo não retornou um workout");
   return JSON.parse(text);
 }
