@@ -15,6 +15,7 @@ import {
   Clock3,
   Dumbbell,
   FileUp,
+  Github,
   History as HistoryIcon,
   Loader2,
   LogOut,
@@ -343,7 +344,8 @@ function Landing() {
             onClick={() => startLogin()}
             className="mt-8 bg-[#e06b3c] px-6 text-white hover:bg-[#c8562c]"
           >
-            Entrar no meu espaço <ChevronRight className="ml-2 h-4 w-4" />
+            <Github className="mr-2 h-4 w-4" />
+            Entrar com GitHub
           </Button>
         </div>
         <p className="text-xs uppercase tracking-[0.18em] text-[#7e877c]">

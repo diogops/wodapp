@@ -33,8 +33,21 @@ export function registerOAuthRoutes(app: Express) {
   // O redirect sai do servidor para que GITHUB_CLIENT_SECRET nunca chegue ao
   // browser, e para que o nonce anti-CSRF seja criado no mesmo lugar que o valida.
   app.get("/api/oauth/login", (req: Request, res: Response) => {
-    if (!ENV.githubClientId) {
-      res.status(500).send("GITHUB_CLIENT_ID não configurado");
+    const missing = [
+      !ENV.githubClientId && "GITHUB_CLIENT_ID",
+      !ENV.githubClientSecret && "GITHUB_CLIENT_SECRET",
+      !ENV.ownerGithubLogin && "OWNER_GITHUB_LOGIN",
+    ].filter(Boolean);
+
+    if (missing.length) {
+      res.status(500).type("html").send(
+        `<!doctype html><meta charset="utf-8"><title>Login indisponível</title>` +
+          `<body style="font-family:system-ui;max-width:34rem;margin:12vh auto;padding:0 1.5rem;line-height:1.6;color:#20231f">` +
+          `<h1 style="font-size:1.3rem">Login ainda não configurado</h1>` +
+          `<p>Falta definir no serviço: <code>${missing.join("</code>, <code>")}</code>.</p>` +
+          `<p>Crie um OAuth App em <b>github.com/settings/developers</b> com o callback ` +
+          `<code>${getRedirectUri(req)}</code> e grave essas variáveis no Railway.</p></body>`
+      );
       return;
     }
 
