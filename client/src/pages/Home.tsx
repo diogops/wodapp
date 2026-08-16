@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SurpriseWodDialog } from "@/components/SurpriseWodDialog";
 import { DraftWodPanel } from "@/components/DraftWodPanel";
 import { trpc } from "@/lib/trpc";
@@ -23,6 +24,7 @@ import {
   History as HistoryIcon,
   Loader2,
   LogOut,
+  Pencil,
   Plus,
   SkipForward,
   Sparkles,
@@ -93,6 +95,45 @@ function signalTimerEnd() {
     });
     window.setTimeout(() => ctx.close().catch(() => {}), 1600);
   } catch {}
+}
+
+/**
+ * Botão só de ícone com dica. O rótulo textual vira `aria-label` e tooltip —
+ * no celular o tooltip não abre no toque, então o aria-label é o que sustenta
+ * a acessibilidade, não um extra.
+ */
+function IconAction({
+  label,
+  onClick,
+  disabled,
+  className,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 ${className ?? ""}`}
+          aria-label={label}
+          title={label}
+          disabled={disabled}
+          onClick={onClick}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 function getExerciseDemo(name: string) {
@@ -275,24 +316,19 @@ export default function Home() {
   return (
     <div className={`${getWorkoutShellClass(tab)} ${tab === "today" ? "workout-mode min-h-screen bg-[#f7f7f2] text-[#20231f]" : "min-h-screen bg-[#f7f7f2] text-[#20231f]"}`} data-workout-mode={tab === "today" ? "locked" : "standard"}>
       <header className="sticky top-0 z-30 border-b border-[#dedfd6] bg-[#f7f7f2]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2 sm:px-6">
           <button
             type="button"
             className="flex items-center gap-3 rounded-2xl text-left"
             aria-label="Voltar para o treino de hoje"
             onClick={() => setTab("today")}
           >
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[#20231f] text-[#f7f7f2]">
-              <Dumbbell className="h-5 w-5" />
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-[#20231f] text-[#f7f7f2]">
+              <Dumbbell className="h-4 w-4" />
             </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#e06b3c]">
-                MOVEMENT / LOG
-              </p>
-              <h1 className="font-display text-xl font-semibold leading-none">
-                Workout Sequencer
-              </h1>
-            </div>
+            <h1 className="font-display text-base font-semibold leading-none">
+              Workout Sequencer
+            </h1>
           </button>
           <div className="flex items-center gap-2">
             {draft && (
@@ -322,17 +358,15 @@ export default function Home() {
         </div>
       </header>
       <main className={tab === "today" ? "workout-mode-main mx-auto flex min-h-0 max-w-6xl flex-col px-4 py-3 sm:px-6 sm:py-10" : "mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10"}>
-        <div className="workout-dashboard-chrome workout-intro mb-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        {/* Intro enxuta: na Sequência ela ficava entre o cabeçalho e os cards,
+            empurrando a lista para baixo sem acrescentar informação. */}
+        <div className="workout-dashboard-chrome workout-intro mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div>
-            <p className="mb-2 text-sm font-medium text-[#e06b3c]">
-              Seu ritmo, sua sequência
-            </p>
-            <h2 className="font-display text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">
+            <h2 className="font-display text-2xl font-semibold tracking-[-0.03em]">
               Treinar é aparecer.
             </h2>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-[#6d746a]">
-              Uma fila viva para manter consistência sem transformar o treino em
-              burocracia.
+            <p className="mt-0.5 text-sm text-[#6d746a]">
+              Sua fila, sem burocracia.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -801,69 +835,53 @@ function Today({
 
 function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, onExportPdf, exportingId }: any) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-1.5">
       {workouts.map((workout: any, index: number) => (
-        <Card key={workout.id} className="border-[#dedfd6] bg-white">
-          <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e9eae2] text-sm font-semibold text-[#6d746a]">
+        <Card key={workout.id} className="gap-0 border-[#dedfd6] bg-white py-0">
+          {/* Linha única em qualquer largura: empilhar no celular dobrava a
+              altura de cada card sem ganhar legibilidade. */}
+          <CardContent className="flex items-center gap-2 px-2.5 py-1.5">
+            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#e9eae2] text-xs font-semibold text-[#6d746a]">
               {String(index + 1).padStart(2, "0")}
             </div>
             <button
               className="min-w-0 flex-1 text-left"
               onClick={() => onSelect(index)}
             >
-              <p className="truncate font-semibold">{workout.title}</p>
-              <p className="mt-1 truncate text-sm text-[#6d746a]">
+              <p className="truncate text-sm font-semibold leading-tight">{workout.title}</p>
+              <p className="truncate text-xs leading-tight text-[#6d746a]">
+                {completedIds.has(workout.id) ? "Concluído · " : ""}
                 {workout.focus || "Sem foco definido"}
               </p>
             </button>
-            <div className="flex items-center gap-1">
-              <Badge variant="outline" className="mr-2 hidden sm:inline-flex">
-                {completedIds.has(workout.id)
-                  ? "Concluído"
-                  : dateLabel(workout.suggestedDate)}
-              </Badge>
-              <Button variant="outline" size="sm" onClick={() => onEdit(workout)}>Editar</Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onExportPdf(workout.id)}
+            <div className="flex shrink-0 items-center">
+              <IconAction label="Editar" onClick={() => onEdit(workout)}>
+                <Pencil className="h-4 w-4" />
+              </IconAction>
+              <IconAction
+                label="Baixar em PDF"
                 disabled={exportingId === workout.id}
-                aria-label={`Baixar ${workout.title} em PDF`}
+                onClick={() => onExportPdf(workout.id)}
               >
                 {exportingId === workout.id ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Download className="h-4 w-4" />
                 )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onMove(index, -1)}
-                disabled={index === 0}
-                aria-label="Mover para cima"
-              >
+              </IconAction>
+              <IconAction label="Mover para cima" disabled={index === 0} onClick={() => onMove(index, -1)}>
                 <ArrowUp className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onMove(index, 1)}
+              </IconAction>
+              <IconAction
+                label="Mover para baixo"
                 disabled={index === workouts.length - 1}
-                aria-label="Mover para baixo"
+                onClick={() => onMove(index, 1)}
               >
                 <ArrowDown className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-[#b14a35]"
-                onClick={() => onDelete(workout.id)}
-                aria-label="Excluir"
-              >
+              </IconAction>
+              <IconAction label="Excluir" className="text-[#b14a35]" onClick={() => onDelete(workout.id)}>
                 <Trash2 className="h-4 w-4" />
-              </Button>
+              </IconAction>
             </div>
           </CardContent>
         </Card>
