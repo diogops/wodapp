@@ -398,9 +398,9 @@ export default function Home() {
           </div>
         </div>
       </header>
-      {/* pb-24 fora do modo de treino: sem isso o último card fica embaixo do
-          rodapé fixo e não há como alcançá-lo. */}
-      <main className={tab === "today" ? "workout-mode-main mx-auto flex min-h-0 max-w-6xl flex-col px-4 py-3 sm:px-6 sm:py-10" : "mx-auto max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:pt-10"}>
+      {/* Folga inferior fora do modo de treino: sem ela o último card fica
+          embaixo do rodapé fixo e não há como alcançá-lo. */}
+      <main className={tab === "today" ? "workout-mode-main mx-auto flex min-h-0 max-w-6xl flex-col px-4 py-3 sm:px-6 sm:py-10" : "mx-auto max-w-6xl px-4 pb-36 pt-6 sm:px-6 sm:pt-10"}>
         {/* Intro enxuta: na Sequência ela ficava entre o cabeçalho e os cards,
             empurrando a lista para baixo sem acrescentar informação. */}
         <div className="workout-dashboard-chrome workout-intro mb-4">
@@ -500,7 +500,10 @@ export default function Home() {
       {/* Ações de criação no rodapé, fixas. `workout-dashboard-chrome` as
           esconde no modo de treino, onde o rodapé pertence ao workout. */}
       <footer className="workout-dashboard-chrome fixed inset-x-0 bottom-0 z-30 border-t border-[#dedfd6] bg-[#f7f7f2]/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-center gap-1.5 px-4 py-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] sm:px-6">
+        {/* Folga generosa embaixo: soma-se ao safe-area do iOS para os botões
+            não encostarem na barra de gestos nem na barra do navegador, que
+            aparece e some conforme a rolagem. */}
+        <div className="mx-auto flex max-w-6xl items-center justify-center gap-1.5 px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6">
             {/* Uma linha só: com os rótulos longos os três quebravam em duas
                 no celular. A função completa vive na dica de cada botão. */}
             <div className="flex flex-nowrap items-center gap-1.5">
