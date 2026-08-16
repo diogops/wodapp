@@ -122,7 +122,7 @@ function IconAction({
           type="button"
           variant="ghost"
           size="icon"
-          className={`h-8 w-8 ${className ?? ""}`}
+          className={`h-10 w-10 ${className ?? ""}`}
           aria-label={label}
           title={label}
           disabled={disabled}
@@ -835,21 +835,21 @@ function Today({
 
 function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, onExportPdf, exportingId }: any) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2.5">
       {workouts.map((workout: any, index: number) => (
         <Card key={workout.id} className="gap-0 border-[#dedfd6] bg-white py-0">
           {/* Linha única em qualquer largura: empilhar no celular dobrava a
               altura de cada card sem ganhar legibilidade. */}
-          <CardContent className="flex items-center gap-2 px-2.5 py-1.5">
-            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#e9eae2] text-xs font-semibold text-[#6d746a]">
+          <CardContent className="flex items-center gap-3 px-3.5 py-2.5">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e9eae2] text-sm font-semibold text-[#6d746a]">
               {String(index + 1).padStart(2, "0")}
             </div>
             <button
               className="min-w-0 flex-1 text-left"
               onClick={() => onSelect(index)}
             >
-              <p className="truncate text-sm font-semibold leading-tight">{workout.title}</p>
-              <p className="truncate text-xs leading-tight text-[#6d746a]">
+              <p className="truncate text-base font-semibold leading-snug">{workout.title}</p>
+              <p className="truncate text-sm leading-snug text-[#6d746a]">
                 {completedIds.has(workout.id) ? "Concluído · " : ""}
                 {workout.focus || "Sem foco definido"}
               </p>
