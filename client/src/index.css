@@ -270,16 +270,45 @@ button:focus-visible,
     padding: 0.35rem;
   }
 
+  /* Espaço entre as seções: o space-y-3 do Tailwind é caro quando há 5 blocos. */
+  .workout-mode .workout-card-body > * + * { margin-top: 0.3rem; }
+
   .workout-mode .workout-card-body > section {
     border-radius: 0.65rem;
-    padding: 0.55rem 0.65rem;
+    padding: 0.4rem 0.55rem;
   }
-  .workout-mode .workout-card-body > section > div:first-child { margin-bottom: 0.3rem; }
-  .workout-mode .workout-card-body > section h3 { font-size: 0.85rem; line-height: 1.1; }
-  .workout-mode .workout-card-body > section > div:not(:first-child) { padding-block: 0.42rem; }
-  .workout-mode .workout-card-body > section p { font-size: 0.78rem; line-height: 1.2; }
-  .workout-mode .workout-card-body > section p.mt-1 { margin-top: 0.18rem; font-size: 0.68rem; }
+  .workout-mode .workout-card-body > section > div:first-child { margin-bottom: 0.15rem; }
+  .workout-mode .workout-card-body > section h3 { font-size: 0.8rem; line-height: 1.1; }
+  .workout-mode .workout-card-body > section p { font-size: 0.76rem; line-height: 1.15; }
   .workout-mode .workout-card-body > section button { font-size: 0.68rem; line-height: 1; }
+
+  /* Nome e prescrição na mesma linha. Empilhados, cada exercício custava duas
+     linhas — com ~15 exercícios isso sozinho estourava o viewport. */
+  .workout-mode .workout-exercise-row { padding-block: 0.28rem; }
+  .workout-mode .workout-exercise-main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.45rem;
+  }
+  .workout-mode .workout-exercise-prescription {
+    margin-top: 0;
+    font-size: 0.68rem;
+  }
+  .workout-mode .workout-exercise-demo {
+    height: 1.35rem;
+    min-height: 1.35rem;
+    padding-inline: 0.35rem;
+  }
+
+  /* Observações acompanham a tipografia da prescrição do exercício. */
+  .workout-mode .workout-notes {
+    font-size: 0.68rem;
+    line-height: 1.25;
+    margin-top: 0.3rem;
+    padding: 0.4rem 0.5rem;
+  }
 
   .workout-mode .workout-card > .border-t { gap: 0.35rem; padding: 0.35rem; }
   .workout-mode .workout-card > .border-t button { min-height: 2rem; height: 2rem; padding-inline: 0.55rem; font-size: 0.78rem; }

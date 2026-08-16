@@ -1,4 +1,4 @@
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
@@ -26,17 +26,19 @@ class SDKServer {
     return new TextEncoder().encode(ENV.cookieSecret);
   }
 
+  /**
+   * Emite o token sem claim `exp`: a sessão vale até o logout, por decisão de
+   * produto (app pessoal, usado no celular durante o treino — reautenticar no
+   * meio de um WOD é atrito puro). Para invalidar todas as sessões de uma vez,
+   * troque JWT_SECRET no Railway.
+   */
   async createSessionToken(
     openId: string,
-    options: { expiresInMs?: number; name?: string } = {}
+    options: { name?: string } = {}
   ): Promise<string> {
-    const issuedAt = Date.now();
-    const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
-    const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
-
     return new SignJWT({ openId, name: options.name || "" })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-      .setExpirationTime(expirationSeconds)
+      .setIssuedAt()
       .sign(this.getSessionSecret());
   }
 

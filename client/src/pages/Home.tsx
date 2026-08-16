@@ -443,12 +443,12 @@ function Today({
                 {section.exercises?.map((exercise: any) => (
                   <div
                     key={exercise.id}
-                    className="border-t border-[#ecece6] py-3 first:border-0 first:pt-0"
+                    className="workout-exercise-row border-t border-[#ecece6] py-3 first:border-0 first:pt-0"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+                      <div className="workout-exercise-main min-w-0">
                         <p className="font-medium">{exercise.name}</p>
-                        <p className="mt-1 text-sm leading-5 text-[#6d746a]">
+                        <p className="workout-exercise-prescription mt-1 text-sm leading-5 text-[#6d746a]">
                           {exercise.prescription ||
                             [exercise.sets, exercise.reps, exercise.duration, exercise.load]
                               .filter(Boolean)
@@ -460,25 +460,31 @@ function Today({
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="shrink-0 px-2 text-xs text-[#e06b3c] hover:bg-[#f4e4dd]"
+                          className="workout-exercise-demo shrink-0 px-2 text-xs text-[#e06b3c] hover:bg-[#f4e4dd]"
                           aria-expanded={expandedExercise === String(exercise.id)}
+                          aria-label={`Ver demonstração de ${exercise.name}`}
                           onClick={() => setExpandedExercise(expandedExercise === String(exercise.id) ? null : String(exercise.id))}
                         >
-                          {expandedExercise === String(exercise.id) ? "Ocultar" : "Ver demonstração"}
+                          <span className="sm:hidden">
+                            {expandedExercise === String(exercise.id) ? "Ocultar" : "Ver"}
+                          </span>
+                          <span className="hidden sm:inline">
+                            {expandedExercise === String(exercise.id) ? "Ocultar" : "Ver demonstração"}
+                          </span>
                         </Button>
                       ) : null}
                     </div>
                   </div>
                 ))}
                 {section.notes && (
-                  <p className="mt-3 rounded-xl bg-[#f1f1eb] p-3 text-xs leading-5 text-[#6d746a]">
+                  <p className="workout-notes mt-3 rounded-xl bg-[#f1f1eb] p-3 text-xs leading-5 text-[#6d746a]">
                     {section.notes}
                   </p>
                 )}
               </section>
             ))}
             {current.notes && (
-              <p className="px-1 text-sm leading-6 text-[#6d746a]">
+              <p className="workout-notes px-1 text-sm leading-6 text-[#6d746a]">
                 {current.notes}
               </p>
             )}
