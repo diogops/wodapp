@@ -136,6 +136,47 @@ function IconAction({
   );
 }
 
+/**
+ * Botão de rótulo curto com a função completa na dica. Os rótulos são curtos
+ * para os três caberem numa linha só no celular; o `title`/`aria-label` é o
+ * que explica a ação, já que no toque o tooltip não abre.
+ */
+function HintButton({
+  hint,
+  onClick,
+  disabled,
+  className,
+  variant,
+  children,
+}: {
+  hint: string;
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
+  variant?: "outline";
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          size="sm"
+          variant={variant}
+          className={`shrink-0 px-2.5 ${className ?? ""}`}
+          aria-label={hint}
+          title={hint}
+          disabled={disabled}
+          onClick={onClick}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{hint}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function getExerciseDemo(name: string) {
   const normalized = name.trim().toLowerCase();
   return Object.entries(EXERCISE_DEMOS).find(([key]) => normalized.includes(key))?.[1] || EXERCISE_DEMOS.generic;
@@ -357,49 +398,15 @@ export default function Home() {
           </div>
         </div>
       </header>
-      <main className={tab === "today" ? "workout-mode-main mx-auto flex min-h-0 max-w-6xl flex-col px-4 py-3 sm:px-6 sm:py-10" : "mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10"}>
+      {/* pb-24 fora do modo de treino: sem isso o último card fica embaixo do
+          rodapé fixo e não há como alcançá-lo. */}
+      <main className={tab === "today" ? "workout-mode-main mx-auto flex min-h-0 max-w-6xl flex-col px-4 py-3 sm:px-6 sm:py-10" : "mx-auto max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:pt-10"}>
         {/* Intro enxuta: na Sequência ela ficava entre o cabeçalho e os cards,
             empurrando a lista para baixo sem acrescentar informação. */}
-        <div className="workout-dashboard-chrome workout-intro mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-          <div>
-            <h2 className="font-display text-2xl font-semibold tracking-[-0.03em]">
-              Treinar é aparecer.
-            </h2>
-            <p className="mt-0.5 text-sm text-[#6d746a]">
-              Sua fila, sem burocracia.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              className="bg-[#e06b3c] text-white hover:bg-[#c8562c]"
-              onClick={() => setShowSurprise(true)}
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              WOD surpresa
-            </Button>
-            <Button variant="outline" onClick={() => setShowCreate(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo workout
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => fileRef.current?.click()}
-              disabled={importPdf.isPending}
-            >
-              <FileUp className="mr-2 h-4 w-4" />
-              {importPdf.isPending ? "Lendo PDF…" : "Importar PDF"}
-            </Button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={event => {
-                void importFile(event.target.files?.[0]);
-                event.currentTarget.value = "";
-              }}
-            />
-          </div>
+        <div className="workout-dashboard-chrome workout-intro mb-4">
+          <h2 className="font-display text-2xl font-semibold tracking-[-0.03em]">
+            Treinar é aparecer.
+          </h2>
         </div>
         <Tabs
           value={tab}
@@ -407,7 +414,7 @@ export default function Home() {
           onValueChange={value => setTab(value as Tab)}
           className="workout-dashboard-chrome mb-6"
         >
-          <TabsList className="h-11 bg-[#e9eae2] p-1">
+          <TabsList className="mx-auto flex h-11 w-fit bg-[#e9eae2] p-1">
             <TabsTrigger
               value="today"
               className="gap-2 data-[state=active]:bg-white"
@@ -490,6 +497,55 @@ export default function Home() {
           />
         )}
       </main>
+      {/* Ações de criação no rodapé, fixas. `workout-dashboard-chrome` as
+          esconde no modo de treino, onde o rodapé pertence ao workout. */}
+      <footer className="workout-dashboard-chrome fixed inset-x-0 bottom-0 z-30 border-t border-[#dedfd6] bg-[#f7f7f2]/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-center gap-1.5 px-4 py-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] sm:px-6">
+            {/* Uma linha só: com os rótulos longos os três quebravam em duas
+                no celular. A função completa vive na dica de cada botão. */}
+            <div className="flex flex-nowrap items-center gap-1.5">
+              <HintButton
+                hint="Gerar um WOD com a IA"
+                className="bg-[#e06b3c] text-white hover:bg-[#c8562c]"
+                onClick={() => setShowSurprise(true)}
+              >
+                <Sparkles className="mr-1.5 h-4 w-4" />
+                WOD surpresa
+              </HintButton>
+              <HintButton
+                hint="Criar um workout manualmente"
+                variant="outline"
+                onClick={() => setShowCreate(true)}
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                Novo
+              </HintButton>
+              <HintButton
+                hint="Importar um workout de um arquivo PDF"
+                variant="outline"
+                disabled={importPdf.isPending}
+                onClick={() => fileRef.current?.click()}
+              >
+                {importPdf.isPending ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <FileUp className="mr-1.5 h-4 w-4" />
+                )}
+                PDF
+              </HintButton>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={event => {
+                  void importFile(event.target.files?.[0]);
+                  event.currentTarget.value = "";
+                }}
+              />
+            </div>
+        </div>
+      </footer>
     </div>
   );
 }
