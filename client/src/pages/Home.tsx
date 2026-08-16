@@ -22,11 +22,13 @@ import {
   Dumbbell,
   FileUp,
   Github,
+  LayoutGrid,
   History as HistoryIcon,
   Loader2,
   LogOut,
   Pencil,
   Plus,
+  Rows3,
   SkipForward,
   Sparkles,
   Timer as TimerIcon,
@@ -896,59 +898,174 @@ function Today({
   );
 }
 
+type LibraryView = "list" | "grid";
+
+const VIEW_STORAGE_KEY = "wodapp:library-view";
+
 function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, onExportPdf, exportingId }: any) {
+  // Preferência de visualização persiste: trocar de aba ou recarregar não pode
+  // devolver o usuário para o modo que ele não escolheu.
+  const [view, setView] = useState<LibraryView>(() => {
+    try {
+      return localStorage.getItem(VIEW_STORAGE_KEY) === "grid" ? "grid" : "list";
+    } catch {
+      return "list";
+    }
+  });
+
+  const changeView = (next: LibraryView) => {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {}
+  };
+
   return (
     <div className="space-y-2.5">
-      {workouts.map((workout: any, index: number) => (
-        <Card key={workout.id} className="gap-0 border-[#dedfd6] bg-white py-0">
-          {/* Linha única em qualquer largura: empilhar no celular dobrava a
-              altura de cada card sem ganhar legibilidade. */}
-          <CardContent className="flex items-center gap-3 px-3.5 py-2.5">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e9eae2] text-sm font-semibold text-[#6d746a]">
-              {String(index + 1).padStart(2, "0")}
-            </div>
-            <button
-              className="min-w-0 flex-1 text-left"
-              onClick={() => onSelect(index)}
-            >
-              <p className="truncate text-base font-semibold leading-snug">{workout.title}</p>
-              <p className="truncate text-sm leading-snug text-[#6d746a]">
-                {completedIds.has(workout.id) ? "Concluído · " : ""}
-                {workout.focus || "Sem foco definido"}
-              </p>
-            </button>
-            <div className="flex shrink-0 items-center">
-              <IconAction label="Editar" onClick={() => onEdit(workout)}>
-                <Pencil className="h-4 w-4" />
-              </IconAction>
-              <IconAction
-                label="Baixar em PDF"
-                disabled={exportingId === workout.id}
-                onClick={() => onExportPdf(workout.id)}
-              >
-                {exportingId === workout.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-              </IconAction>
-              <IconAction label="Mover para cima" disabled={index === 0} onClick={() => onMove(index, -1)}>
-                <ArrowUp className="h-4 w-4" />
-              </IconAction>
-              <IconAction
-                label="Mover para baixo"
-                disabled={index === workouts.length - 1}
-                onClick={() => onMove(index, 1)}
-              >
-                <ArrowDown className="h-4 w-4" />
-              </IconAction>
-              <IconAction label="Excluir" className="text-[#b14a35]" onClick={() => onDelete(workout.id)}>
-                <Trash2 className="h-4 w-4" />
-              </IconAction>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+      <div className="flex items-center justify-end gap-1">
+        <IconAction
+          label="Ver em lista"
+          className={view === "list" ? "bg-[#e9eae2] text-[#20231f]" : ""}
+          onClick={() => changeView("list")}
+        >
+          <Rows3 className="h-4 w-4" />
+        </IconAction>
+        <IconAction
+          label="Ver em cards"
+          className={view === "grid" ? "bg-[#e9eae2] text-[#20231f]" : ""}
+          onClick={() => changeView("grid")}
+        >
+          <LayoutGrid className="h-4 w-4" />
+        </IconAction>
+      </div>
+
+      {view === "grid" ? (
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+          {workouts.map((workout: any, index: number) => {
+            const done = completedIds.has(workout.id);
+            return (
+              <Card key={workout.id} className="gap-0 overflow-hidden border-[#dedfd6] bg-white py-0">
+                <CardContent className="flex flex-col gap-1.5 p-2.5">
+                  <button className="min-w-0 text-left" onClick={() => onSelect(index)}>
+                    <div className="mb-1 flex items-center justify-between">
+                      {/* Ícone no lugar do número: no card o estado do workout
+                          comunica mais rápido que a posição na fila. */}
+                      <span
+                        className={`grid h-7 w-7 place-items-center rounded-lg ${
+                          done ? "bg-[#20231f] text-[#f7f7f2]" : "bg-[#f0e4dc] text-[#e06b3c]"
+                        }`}
+                      >
+                        {done ? <Check className="h-4 w-4" /> : <Dumbbell className="h-4 w-4" />}
+                      </span>
+                      <span className="text-[10px] font-bold tracking-widest text-[#a0a89c]">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                    </div>
+                    {/* Duas linhas de título definem a altura do card e mantêm
+                        a grade alinhada mesmo com nomes de tamanhos diferentes. */}
+                    <p className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug">
+                      {workout.title}
+                    </p>
+                    <p className="truncate text-xs text-[#6d746a]">
+                      {workout.focus || "Sem foco definido"}
+                    </p>
+                  </button>
+                  <div className="flex items-center justify-between border-t border-[#ecece6] pt-1">
+                    <IconAction label="Editar" className="h-8 w-8" onClick={() => onEdit(workout)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </IconAction>
+                    <IconAction
+                      label="Baixar em PDF"
+                      className="h-8 w-8"
+                      disabled={exportingId === workout.id}
+                      onClick={() => onExportPdf(workout.id)}
+                    >
+                      {exportingId === workout.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" />
+                      )}
+                    </IconAction>
+                    <IconAction
+                      label="Mover para cima"
+                      className="h-8 w-8"
+                      disabled={index === 0}
+                      onClick={() => onMove(index, -1)}
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </IconAction>
+                    <IconAction
+                      label="Mover para baixo"
+                      className="h-8 w-8"
+                      disabled={index === workouts.length - 1}
+                      onClick={() => onMove(index, 1)}
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </IconAction>
+                    <IconAction
+                      label="Excluir"
+                      className="h-8 w-8 text-[#b14a35]"
+                      onClick={() => onDelete(workout.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </IconAction>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {workouts.map((workout: any, index: number) => (
+            <Card key={workout.id} className="gap-0 border-[#dedfd6] bg-white py-0">
+              {/* Linha única em qualquer largura: empilhar no celular dobrava a
+                  altura de cada card sem ganhar legibilidade. */}
+              <CardContent className="flex items-center gap-3 px-3.5 py-2.5">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e9eae2] text-sm font-semibold text-[#6d746a]">
+                  {String(index + 1).padStart(2, "0")}
+                </div>
+                <button className="min-w-0 flex-1 text-left" onClick={() => onSelect(index)}>
+                  <p className="truncate text-base font-semibold leading-snug">{workout.title}</p>
+                  <p className="truncate text-sm leading-snug text-[#6d746a]">
+                    {completedIds.has(workout.id) ? "Concluído · " : ""}
+                    {workout.focus || "Sem foco definido"}
+                  </p>
+                </button>
+                <div className="flex shrink-0 items-center">
+                  <IconAction label="Editar" onClick={() => onEdit(workout)}>
+                    <Pencil className="h-4 w-4" />
+                  </IconAction>
+                  <IconAction
+                    label="Baixar em PDF"
+                    disabled={exportingId === workout.id}
+                    onClick={() => onExportPdf(workout.id)}
+                  >
+                    {exportingId === workout.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                  </IconAction>
+                  <IconAction label="Mover para cima" disabled={index === 0} onClick={() => onMove(index, -1)}>
+                    <ArrowUp className="h-4 w-4" />
+                  </IconAction>
+                  <IconAction
+                    label="Mover para baixo"
+                    disabled={index === workouts.length - 1}
+                    onClick={() => onMove(index, 1)}
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </IconAction>
+                  <IconAction label="Excluir" className="text-[#b14a35]" onClick={() => onDelete(workout.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </IconAction>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
