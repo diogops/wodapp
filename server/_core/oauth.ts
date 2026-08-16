@@ -28,6 +28,31 @@ function getRedirectUri(req: Request) {
 }
 
 type GitHubUser = { id: number; login: string; name: string | null; email: string | null };
+type GitHubEmail = { email: string; primary: boolean; verified: boolean };
+
+/**
+ * E-mail primário **verificado** da conta. Só o verificado serve para
+ * autorização: um e-mail não verificado pode ser qualquer endereço digitado
+ * por quem criou a conta, inclusive o de outra pessoa.
+ */
+async function fetchPrimaryEmail(accessToken: string, fallback: string | null) {
+  try {
+    const response = await fetch("https://api.github.com/user/emails", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "workout-sequencer",
+      },
+    });
+    if (!response.ok) return fallback;
+    const emails = (await response.json()) as GitHubEmail[];
+    const primary = emails.find(item => item.primary && item.verified);
+    return primary?.email ?? emails.find(item => item.verified)?.email ?? fallback;
+  } catch (error) {
+    console.warn("[OAuth] Falha ao ler e-mails do GitHub:", String(error));
+    return fallback;
+  }
+}
 
 export function registerOAuthRoutes(app: Express) {
   // O redirect sai do servidor para que GITHUB_CLIENT_SECRET nunca chegue ao
@@ -117,8 +142,20 @@ export function registerOAuthRoutes(app: Express) {
 
       const githubUser = (await userResponse.json()) as GitHubUser;
 
-      // App pessoal: só o dono entra. Sem essa checagem, qualquer conta do
-      // GitHub conseguiria criar um usuário e uma fila de workouts aqui.
+      // `/user` só devolve o e-mail se ele for público no perfil, então a
+      // allowlist tem que ler `/user/emails` — que exige o escopo `user:email`
+      // e é onde está o e-mail primário verificado.
+      const email = await fetchPrimaryEmail(tokenData.access_token, githubUser.email);
+
+      // App pessoal: allowlist explícita. Sem ela, qualquer conta do GitHub
+      // criaria um usuário e uma fila de workouts aqui. Vazia bloqueia todo
+      // mundo de propósito — some a variável, ninguém entra.
+      if (!email || !ENV.allowedEmails.includes(email.toLowerCase())) {
+        console.warn("[OAuth] Acesso negado para", email ?? "(sem e-mail verificado)");
+        res.status(403).send("Este aplicativo é pessoal e está restrito aos e-mails autorizados.");
+        return;
+      }
+
       if (
         ENV.ownerGithubLogin &&
         githubUser.login.toLowerCase() !== ENV.ownerGithubLogin.toLowerCase()
@@ -131,7 +168,7 @@ export function registerOAuthRoutes(app: Express) {
       await db.upsertUser({
         openId,
         name: githubUser.name || githubUser.login,
-        email: githubUser.email ?? null,
+        email,
         loginMethod: "github",
         lastSignedIn: new Date(),
       });

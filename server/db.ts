@@ -92,6 +92,29 @@ export async function getWorkoutsForUser(userId: number) {
   }));
 }
 
+/**
+ * Títulos de seção já usados pelo atleta, mais frequentes primeiro. Alimenta o
+ * select do formulário: título livre em cada workout despadroniza a fila e
+ * impede comparar sessões equivalentes ao longo do tempo.
+ */
+export async function getSectionTitles(userId: number) {
+  const db = await getDb();
+  const rows = await db
+    .select({ title: workoutSections.title })
+    .from(workoutSections)
+    .innerJoin(workouts, eq(workoutSections.workoutId, workouts.id))
+    .where(eq(workouts.userId, userId));
+
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const title = row.title.trim();
+    if (title) counts.set(title, (counts.get(title) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "pt-BR"))
+    .map(([title]) => title);
+}
+
 export async function getWorkoutForUser(userId: number, workoutId: number) {
   const all = await getWorkoutsForUser(userId);
   return all.find(workout => workout.id === workoutId);

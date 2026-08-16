@@ -3,7 +3,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createWorkout, deleteDraft, deleteWorkout, ensureDefaultWorkouts, getDraft, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, recordSession, saveDraft, updateWorkoutOrder } from "./db";
+import { createWorkout, deleteDraft, deleteWorkout, ensureDefaultWorkouts, getDraft, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, recordSession, saveDraft, updateWorkoutOrder } from "./db";
 import { storagePut } from "./storage";
 import { isCatalogExercise, isFocusArea } from "@shared/exerciseCatalog";
 import { extractWorkoutFromPdf, generateWorkout } from "./llm";
@@ -22,6 +22,7 @@ export const appRouter = router({
   workouts: router({
     list: protectedProcedure.query(({ ctx }) => ensureDefaultWorkouts(ctx.user.id)),
     history: protectedProcedure.query(({ ctx }) => getSessionHistory(ctx.user.id)),
+    sectionTitles: protectedProcedure.query(({ ctx }) => getSectionTitles(ctx.user.id)),
     get: protectedProcedure.input(z.object({ id: z.number() })).query(({ ctx, input }) => getWorkoutForUser(ctx.user.id, input.id)),
     create: protectedProcedure.input(workoutSchema).mutation(({ ctx, input }) => createWorkout({ ...input, userId: ctx.user.id, orderIndex: 9999 })),
     update: protectedProcedure.input(z.object({ id: z.number(), data: workoutSchema })).mutation(async ({ ctx, input }) => {
