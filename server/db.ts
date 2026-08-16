@@ -2,7 +2,7 @@ import path from "node:path";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { InsertUser, users, workouts, workoutExercises, workoutSections, workoutSessions } from "../drizzle/schema";
+import { InsertUser, users, workoutDrafts, workouts, workoutExercises, workoutSections, workoutSessions } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -143,6 +143,45 @@ export async function updateWorkoutOrder(userId: number, orderedIds: number[]) {
     await db.update(workouts).set({ orderIndex: index }).where(and(eq(workouts.id, orderedIds[index]), eq(workouts.userId, userId)));
   }
   return getWorkoutsForUser(userId);
+}
+
+/**
+ * Um rascunho por usuário: gerar de novo substitui a proposta anterior em vez
+ * de acumular uma pilha de sugestões esquecidas.
+ */
+export async function saveDraft(userId: number, payload: unknown, source = "generated") {
+  const db = await getDb();
+  await db.delete(workoutDrafts).where(eq(workoutDrafts.userId, userId));
+  const inserted = await db
+    .insert(workoutDrafts)
+    .values({ userId, payload: JSON.stringify(payload), source })
+    .returning();
+  return inserted[0];
+}
+
+export async function getDraft(userId: number) {
+  const db = await getDb();
+  const rows = await db
+    .select()
+    .from(workoutDrafts)
+    .where(eq(workoutDrafts.userId, userId))
+    .orderBy(desc(workoutDrafts.createdAt))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  try {
+    return { id: row.id, source: row.source, createdAt: row.createdAt, workout: JSON.parse(row.payload) };
+  } catch {
+    // Payload corrompido não pode travar a tela inicial para sempre.
+    await deleteDraft(userId);
+    return null;
+  }
+}
+
+export async function deleteDraft(userId: number) {
+  const db = await getDb();
+  await db.delete(workoutDrafts).where(eq(workoutDrafts.userId, userId));
+  return true;
 }
 
 export async function deleteWorkout(userId: number, workoutId: number) {

@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SurpriseWodDialog } from "@/components/SurpriseWodDialog";
+import { DraftWodPanel } from "@/components/DraftWodPanel";
 import { trpc } from "@/lib/trpc";
 import {
+  Bell,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -111,6 +113,7 @@ export default function Home() {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [showCreate, setShowCreate] = useState(false);
   const [showSurprise, setShowSurprise] = useState(false);
+  const [showDraft, setShowDraft] = useState(false);
   const [editingWorkout, setEditingWorkout] = useState<any>(null);
   const [pendingImport, setPendingImport] = useState<any>(null);
   const [newWorkout, setNewWorkout] = useState({
@@ -191,15 +194,47 @@ export default function Home() {
     },
     onError: error => toast.error(error.message),
   });
-  // Cai no mesmo rascunho do import de PDF: o workout gerado é revisado e
-  // editado antes de entrar na fila, nunca salvo direto.
+  const draftQuery = trpc.workouts.draft.useQuery(undefined, { enabled: Boolean(user) });
+  const draft = draftQuery.data ?? null;
+  const refreshDraft = () => void utils.workouts.draft.invalidate();
+
+  // O rascunho é persistido no servidor, então a proposta continua disponível
+  // depois de fechar a aba — por isso ela vira notificação, não modal obrigatório.
   const generate = trpc.workouts.generate.useMutation({
-    onSuccess: result => {
+    onSuccess: () => {
       setShowSurprise(false);
-      setPendingImport(result.workout);
-      toast.success("Workout gerado. Revise antes de salvar.");
+      setShowDraft(true);
+      refreshDraft();
+      toast.success("Workout proposto. Aceite, ajuste ou descarte.");
     },
     onError: error => toast.error(error.message),
+  });
+  const reviseDraft = trpc.workouts.reviseDraft.useMutation({
+    onSuccess: () => {
+      refreshDraft();
+      toast.success("Workout refeito com o seu ajuste");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const acceptDraft = trpc.workouts.acceptDraft.useMutation({
+    onSuccess: (created, variables) => {
+      refresh();
+      refreshDraft();
+      setShowDraft(false);
+      if (variables.startNow && created) {
+        setTab("today");
+        setSelectedIndex(0);
+      }
+      toast.success(variables.startNow ? "Bora treinar" : "Salvo na sua grade");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const discardDraft = trpc.workouts.discardDraft.useMutation({
+    onSuccess: () => {
+      refreshDraft();
+      setShowDraft(false);
+      toast.success("Proposta descartada");
+    },
   });
   const importPdf = trpc.workouts.importPdf.useMutation({
     onSuccess: result => {
@@ -241,7 +276,12 @@ export default function Home() {
     <div className={`${getWorkoutShellClass(tab)} ${tab === "today" ? "workout-mode min-h-screen bg-[#f7f7f2] text-[#20231f]" : "min-h-screen bg-[#f7f7f2] text-[#20231f]"}`} data-workout-mode={tab === "today" ? "locked" : "standard"}>
       <header className="sticky top-0 z-30 border-b border-[#dedfd6] bg-[#f7f7f2]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="flex items-center gap-3 rounded-2xl text-left"
+            aria-label="Voltar para o treino de hoje"
+            onClick={() => setTab("today")}
+          >
             <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[#20231f] text-[#f7f7f2]">
               <Dumbbell className="h-5 w-5" />
             </div>
@@ -253,8 +293,20 @@ export default function Home() {
                 Workout Sequencer
               </h1>
             </div>
-          </div>
+          </button>
           <div className="flex items-center gap-2">
+            {draft && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative"
+                aria-label="Você tem um workout proposto pela IA"
+                onClick={() => setShowDraft(true)}
+              >
+                <Bell className="h-4 w-4" />
+                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#e06b3c]" />
+              </Button>
+            )}
             <span className="hidden text-sm text-[#6d746a] sm:block">
               {user.name || "Atleta"}
             </span>
@@ -377,6 +429,16 @@ export default function Home() {
           />
         )}
         {tab === "history" && <History items={history} />}
+        {draft && showDraft && (
+          <DraftWodPanel
+            draft={draft}
+            busy={reviseDraft.isPending || acceptDraft.isPending || discardDraft.isPending}
+            onClose={() => setShowDraft(false)}
+            onAccept={(startNow: boolean) => acceptDraft.mutate({ startNow })}
+            onDiscard={() => discardDraft.mutate()}
+            onRevise={(changeRequest: string) => reviseDraft.mutate({ changeRequest })}
+          />
+        )}
         {showSurprise && (
           <SurpriseWodDialog
             busy={generate.isPending}
@@ -539,7 +601,9 @@ function Today({
           </span>
         </span>
       </div>
-      <div className="workout-today-grid grid min-h-0 flex-1 gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+      {/* Sem colunas: a fila lateral foi removida e a trilha vazia do grid
+          deixava ~32% da tela morta à direita no desktop. */}
+      <div className="workout-today-grid grid min-h-0 flex-1 gap-6">
       <section>
         <Card className="workout-card overflow-hidden border-0 bg-[#20231f] text-[#f7f7f2] shadow-[0_18px_60px_rgba(32,35,31,0.16)]">
           <CardHeader>
@@ -573,6 +637,10 @@ function Today({
               <section
                 key={section.id}
                 className="rounded-2xl border border-[#dedfd6] bg-white p-4"
+                // O espaço que sobra é repartido em proporção ao número de
+                // exercícios. Com flex-grow igual, uma seção de 1 exercício
+                // reivindicava tanto quanto uma de 5 e virava um card vazio.
+                style={{ flexGrow: Math.max(1, section.exercises?.length ?? 1) }}
               >
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="font-semibold">{section.title}</h3>
@@ -685,36 +753,6 @@ function Today({
           </div>
         </Card>
       </section>
-      <aside className="hidden" aria-hidden="true">
-        <Card className="border-0 bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="font-display text-xl">Sua fila</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {workouts.map((workout: any, itemIndex: number) => (
-              <button
-                key={workout.id}
-                onClick={() => setIndex(itemIndex)}
-                className={`flex w-full items-center gap-3 rounded-xl p-3 text-left ${itemIndex === index ? "bg-[#f0e4dc]" : "hover:bg-[#f4f4ef]"}`}
-              >
-                <span
-                  className={`grid h-8 w-8 place-items-center rounded-lg text-xs font-bold ${completedIds.has(workout.id) ? "bg-[#20231f] text-white" : "bg-[#e9eae2] text-[#6d746a]"}`}
-                >
-                  {completedIds.has(workout.id) ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    String(itemIndex + 1).padStart(2, "0")
-                  )}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                  {workout.title}
-                </span>
-                <ChevronRight className="h-4 w-4 text-[#a0a89c]" />
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-      </aside>
       {timer && !timer.hidden && (
         <div
           className="fixed inset-0 z-[80] grid place-items-center bg-[#20231f]/80 p-6"
@@ -865,7 +903,9 @@ function CreateWorkout({ value, setValue, busy, onClose, onCreate }: any) {
   const invalid = sections.some((section: any) => !section.title?.trim() || (section.exercises || []).some((exercise: any) => !exercise.name?.trim() || (!exercise.prescription?.trim() && !exercise.sets && !exercise.reps && !exercise.duration && !exercise.load)));
   return (
     <div className="fixed inset-0 z-50 grid place-items-end bg-[#20231f]/50 p-0 sm:place-items-center sm:p-6">
-      <Card className="w-full max-w-lg rounded-b-none border-0 bg-[#f7f7f2] sm:rounded-2xl">
+      {/* Sem teto de altura o formulário simplesmente saía da tela: com seções e
+          exercícios ele fica muito mais alto que o viewport do celular. */}
+      <Card className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-b-none border-0 bg-[#f7f7f2] sm:rounded-2xl">
         <CardHeader className="flex-row items-center justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#e06b3c]">
@@ -879,7 +919,7 @@ function CreateWorkout({ value, setValue, busy, onClose, onCreate }: any) {
             <X className="h-5 w-5" />
           </Button>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain">
           <div>
             <Label htmlFor="title">Nome</Label>
             <Input

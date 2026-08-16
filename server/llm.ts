@@ -58,6 +58,16 @@ const GENERATOR_SYSTEM_PROMPT = [
   "Prescreva volume, tempo e carga concretos — nada de 'a critério'. Use kg para carga e escreva tudo em português.",
   "Respeite os pedidos do atleta: se ele listou exercícios, use-os como espinha dorsal; se listou o que quer trabalhar, o estímulo tem que refletir isso.",
   "Você pode acrescentar movimentos complementares para a sessão fazer sentido, mas não troque o foco pedido por outro.",
+  // O app renderiza cada exercício como uma linha própria em tela de celular.
+  // Um bloco descrito em parágrafo vira uma parede de texto ilegível no treino.
+  "FORMATO — isto define se o treino fica legível no celular:",
+  "Cada movimento é um item separado em `exercises`, com `name` contendo só o nome do movimento (ex.: 'Back Squat', 'Burpee').",
+  "Nunca junte vários movimentos num único exercise, e nunca descreva um bloco inteiro em texto corrido.",
+  "`prescription` é curta, no máximo cerca de 60 caracteres (ex.: '5x3 a 75%', '20s forte / 40s leve').",
+  "Prefira preencher `sets`, `reps`, `duration` e `load` separadamente sempre que o dado existir; deixe vazio o que não se aplica.",
+  "`notes` do exercício e da seção são para orientação técnica curta, não para descrever o treino.",
+  "`notes` do workout tem no máximo duas frases.",
+  "Use `format` da seção para o tipo de bloco (AMRAP 15, EMOM 20, 4 rounds, For Time...).",
 ].join(" ");
 
 const SYSTEM_PROMPT = [
@@ -130,6 +140,8 @@ export type GenerateWorkoutInput = {
   focusAreas: string[];
   notes?: string;
   avoidTitles?: string[];
+  previousWorkout?: unknown;
+  changeRequest?: string;
 };
 
 /**
@@ -138,6 +150,23 @@ export type GenerateWorkoutInput = {
  */
 export async function generateWorkout(input: GenerateWorkoutInput): Promise<unknown> {
   const brief: string[] = [];
+
+  // Revisão: parte do workout anterior e muda só o que foi pedido. Sem o JSON
+  // anterior no contexto, "troca os exercícios de ombro" viraria um workout
+  // inteiramente novo e o atleta perderia o que já tinha aprovado.
+  if (input.previousWorkout && input.changeRequest) {
+    brief.push("Este é o workout que você já propôs ao atleta:");
+    brief.push(JSON.stringify(input.previousWorkout));
+    brief.push(`O atleta pediu este ajuste: ${input.changeRequest}`);
+    brief.push(
+      "Refaça o workout aplicando o ajuste e preservando tudo que ele não pediu para mudar — mesma estrutura, mesmo estímulo, mesmos blocos que continuam fazendo sentido."
+    );
+    if (input.avoidTitles?.length) {
+      brief.push(`Ele já tem estes workouts na fila: ${input.avoidTitles.join("; ")}.`);
+    }
+    brief.push("Devolva o workout completo no schema solicitado.");
+    return requestWorkout(brief.join("\n"));
+  }
 
   brief.push(
     input.exercises.length
@@ -157,7 +186,10 @@ export async function generateWorkout(input: GenerateWorkoutInput): Promise<unkn
     );
   }
   brief.push("Monte o workout no schema solicitado.");
+  return requestWorkout(brief.join("\n"));
+}
 
+async function requestWorkout(prompt: string): Promise<unknown> {
   const response = await getClient().messages.create({
     model: ENV.anthropicModel,
     max_tokens: 16000,
@@ -166,7 +198,7 @@ export async function generateWorkout(input: GenerateWorkoutInput): Promise<unkn
       effort: "medium",
       format: { type: "json_schema", schema: WORKOUT_JSON_SCHEMA },
     },
-    messages: [{ role: "user", content: brief.join("\n") }],
+    messages: [{ role: "user", content: prompt }],
   });
 
   if (response.stop_reason === "refusal") throw new Error("O modelo recusou montar este workout");

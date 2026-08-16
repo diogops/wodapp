@@ -10,6 +10,9 @@ const dbMocks = vi.hoisted(() => ({
   getWorkoutsForUser: vi.fn(),
   recordSession: vi.fn(),
   updateWorkoutOrder: vi.fn(),
+  saveDraft: vi.fn(),
+  getDraft: vi.fn(),
+  deleteDraft: vi.fn(),
 }));
 const storageMocks = vi.hoisted(() => ({ storagePut: vi.fn() }));
 const llmMocks = vi.hoisted(() => ({ extractWorkoutFromPdf: vi.fn(), generateWorkout: vi.fn() }));
@@ -68,7 +71,49 @@ describe("workouts procedures", () => {
       })
     );
     expect(result.workout).toMatchObject({ title: "Gerado" });
+    // Persistido como rascunho, mas fora da fila: a proposta sobrevive ao
+    // fechar a aba sem entrar no sorteio do treino do dia.
+    expect(dbMocks.saveDraft).toHaveBeenCalledWith(7, expect.objectContaining({ title: "Gerado" }));
     expect(dbMocks.createWorkout).not.toHaveBeenCalled();
+  });
+
+  it("accepting a draft creates the workout and clears the draft", async () => {
+    dbMocks.getDraft.mockResolvedValue({
+      id: 1,
+      source: "generated",
+      workout: { title: "Proposto", sections: [] },
+    });
+    dbMocks.createWorkout.mockResolvedValue({ ...workout, title: "Proposto" });
+
+    await appRouter.createCaller(ctx).workouts.acceptDraft({ startNow: true });
+
+    // startNow manda para o topo da fila; salvar na grade vai para o fim.
+    expect(dbMocks.createWorkout).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 7, title: "Proposto", orderIndex: -1 })
+    );
+    expect(dbMocks.deleteDraft).toHaveBeenCalledWith(7);
+  });
+
+  it("refuses to accept when there is no draft", async () => {
+    dbMocks.getDraft.mockResolvedValue(null);
+    await expect(appRouter.createCaller(ctx).workouts.acceptDraft({ startNow: false })).rejects.toThrow();
+    expect(dbMocks.createWorkout).not.toHaveBeenCalled();
+  });
+
+  it("revising a draft feeds the previous workout back to the model", async () => {
+    dbMocks.getDraft.mockResolvedValue({ id: 1, source: "generated", workout: { title: "Antes", sections: [] } });
+    dbMocks.getWorkoutsForUser.mockResolvedValue([]);
+    llmMocks.generateWorkout.mockResolvedValue({ title: "Depois", focus: "", level: "", notes: "", sections: [] });
+
+    const result = await appRouter.createCaller(ctx).workouts.reviseDraft({ changeRequest: "troca os de ombro" });
+
+    expect(llmMocks.generateWorkout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousWorkout: { title: "Antes", sections: [] },
+        changeRequest: "troca os de ombro",
+      })
+    );
+    expect(result.workout).toMatchObject({ title: "Depois" });
   });
 
   it("drops selections that are not in the shared catalog", async () => {

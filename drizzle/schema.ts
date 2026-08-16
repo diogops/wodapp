@@ -52,6 +52,21 @@ export const workoutExercises = pgTable("workoutExercises", {
   orderIndex: integer("orderIndex").notNull().default(0),
 });
 
+/**
+ * Workout proposto pela IA e ainda não aceito. Fica fora de `workouts` de
+ * propósito: um rascunho não pertence à fila e não pode aparecer no sorteio do
+ * treino do dia. Persistido — e não mantido no estado do cliente — para que
+ * fechar a aba não descarte a proposta.
+ */
+export const workoutDrafts = pgTable("workoutDrafts", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  payload: text("payload").notNull(),
+  source: varchar("source", { length: 32 }).notNull().default("generated"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
 export const workoutSessions = pgTable("workoutSessions", {
   id: serial("id").primaryKey(),
   userId: integer("userId").notNull(),
@@ -68,3 +83,4 @@ export type InsertWorkout = typeof workouts.$inferInsert;
 export type WorkoutSection = typeof workoutSections.$inferSelect;
 export type WorkoutExercise = typeof workoutExercises.$inferSelect;
 export type WorkoutSession = typeof workoutSessions.$inferSelect;
+export type WorkoutDraft = typeof workoutDrafts.$inferSelect;

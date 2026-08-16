@@ -3,7 +3,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createWorkout, deleteWorkout, ensureDefaultWorkouts, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, recordSession, updateWorkoutOrder } from "./db";
+import { createWorkout, deleteDraft, deleteWorkout, ensureDefaultWorkouts, getDraft, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, recordSession, saveDraft, updateWorkoutOrder } from "./db";
 import { storagePut } from "./storage";
 import { isCatalogExercise, isFocusArea } from "@shared/exerciseCatalog";
 import { extractWorkoutFromPdf, generateWorkout } from "./llm";
@@ -68,9 +68,41 @@ export const appRouter = router({
           notes: input.notes,
           avoidTitles: existing.map(workout => workout.title).slice(0, 12),
         });
-        // Mesmo contrato do import de PDF: devolve rascunho para revisão, não persiste.
-        return { workout: workoutSchema.parse(generated) };
+        // Persistido como rascunho: fechar a aba não pode descartar a proposta.
+        const workout = workoutSchema.parse(generated);
+        await saveDraft(ctx.user.id, workout);
+        return { workout };
       }),
+    draft: protectedProcedure.query(({ ctx }) => getDraft(ctx.user.id)),
+    reviseDraft: protectedProcedure
+      .input(z.object({ changeRequest: z.string().min(1).max(500) }))
+      .mutation(async ({ ctx, input }) => {
+        const draft = await getDraft(ctx.user.id);
+        if (!draft) throw new Error("Nenhum workout proposto para ajustar");
+        const existing = await getWorkoutsForUser(ctx.user.id);
+        const revised = await generateWorkout({
+          exercises: [],
+          focusAreas: [],
+          previousWorkout: draft.workout,
+          changeRequest: input.changeRequest,
+          avoidTitles: existing.map(workout => workout.title).slice(0, 12),
+        });
+        const workout = workoutSchema.parse(revised);
+        await saveDraft(ctx.user.id, workout);
+        return { workout };
+      }),
+    acceptDraft: protectedProcedure
+      .input(z.object({ startNow: z.boolean().default(false) }))
+      .mutation(async ({ ctx, input }) => {
+        const draft = await getDraft(ctx.user.id);
+        if (!draft) throw new Error("Nenhum workout proposto para salvar");
+        const data = workoutSchema.parse(draft.workout);
+        // Aceito "para treinar" entra no topo da fila; aceito "na grade" vai ao fim.
+        const created = await createWorkout({ ...data, userId: ctx.user.id, orderIndex: input.startNow ? -1 : 9999 });
+        await deleteDraft(ctx.user.id);
+        return created;
+      }),
+    discardDraft: protectedProcedure.mutation(({ ctx }) => deleteDraft(ctx.user.id)),
     importPdf: protectedProcedure.input(z.object({ filename: z.string(), mimeType: z.string().default("application/pdf"), base64: z.string() })).mutation(async ({ ctx, input }) => {
       const bytes = Buffer.from(input.base64, "base64");
       const uploaded = await storagePut(`${ctx.user.id}-workouts/${Date.now()}-${input.filename.replace(/[^a-zA-Z0-9._-]/g, "-")}`, bytes, input.mimeType);
