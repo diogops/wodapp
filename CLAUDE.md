@@ -116,7 +116,18 @@ Consequences worth knowing before changing this area:
 
 **Client** is a single-route app: `App.tsx` routes `/` to `client/src/pages/Home.tsx`, ~740 lines holding all three tabs (`today` / `library` / `history`) plus the create/edit/import dialogs. `client/src/lib/` holds the pure, unit-tested logic extracted out of it (`workoutSelection.ts`, `workoutMode.ts`). `client/src/components/ui/` is stock shadcn/ui (new-york, neutral) — regenerate via `components.json` rather than hand-editing. Several template components (`AIChatBox`, `Map`, `ManusDialog`, `DashboardLayout`) are unused leftovers that still typecheck.
 
-The "today" tab picks a **random** pending workout (`chooseRandomWorkoutIndex`), not the next sequential one; completing or skipping re-rolls, excluding the current index. If every workout is completed, it falls back to the full list.
+## Multimodality: grammar, schedule, opening
+
+CrossFit is the default and stays the default; other modalities are options. The rule that keeps this from rotting is that **modality differences are data, not branches** — there is no `if (modality === 'crossfit')` anywhere, and adding one is the thing to push back on.
+
+- `shared/modalities.ts` — `BLOCK_KINDS`, `METRIC_KEYS`, and `BUILT_IN_MODALITIES`, each carrying a `ModalityGrammar` (allowed block kinds, tracked metrics, load unit, whether rest is first-class, screen vocabulary). `ensureModalities()` seeds these idempotently on every `workouts.list` and backfills legacy workouts to CrossFit. `inferBlockKind()` derives `workoutSections.kind` from the free-text `format`, returning `null` rather than guessing.
+- `shared/generatorPrompt.ts` — builds the AI system prompt **from** the grammar. Only the FORMAT rules are fixed, because they describe how the app renders an exercise on a phone, not how a sport trains. `workouts.generate` takes an optional `modalityId`; without one it falls back to CrossFit.
+- `shared/resolveOpening.ts` — the pure engine deciding which workout the app lands on, evaluated in a fixed order across ten `ResolutionReason` values. All date math is **device-local**. `time_window_match` covers start → end + grace; `nearest_upcoming` covers the lead time *before* the start. Keep those disjoint: folding the lead into the window makes `nearest_upcoming` unreachable, which is exactly the bug the tests caught.
+- `shared/scheduleConflicts.ts` — the week preview and the conflict warning come from one function, so the UI cannot disagree with the warning. Rules without a start time never conflict.
+- `shared/historyStats.ts` — weekly volume (empty weeks included, they're the point) and load progression by **weekly peak**, not average. Exercises with one logged week are dropped: a single point is not a trend.
+- **Being mid-workout is device state**, held in `localStorage` via `client/src/lib/openingSession.ts`, not on the server. Resuming on your phone a workout opened on the desktop would be wrong. The server only hears about a session when it ends.
+
+Selection order on the "today" tab: the opening engine decides first; only if it returns a picker (or nothing to auto-start) does `chooseRandomWorkoutIndex` pick a **random** pending workout. Completing or skipping re-rolls, excluding the current index. If every workout is completed, it falls back to the full list.
 
 ## Workout mode: the locked-viewport contract
 
@@ -137,6 +148,8 @@ Vitest, `environment: "node"` — there is no jsdom and no React Testing Library
 1. **Router tests** (`server/workout-router.test.ts`): `vi.hoisted()` mock objects for `./db`, `./storage`, `./llm`, then `appRouter.createCaller(ctx)` with a hand-built `TrpcContext` carrying a fake user. This is the way to test procedures — no HTTP, no database.
 2. **Schema tests** (`server/workout-format.test.ts`): parse/reject cases against the exported `workoutSchema`.
 3. **Pure-logic and contract tests** (`client/src/lib/*.test.ts`): plain function assertions, plus the source-grep contract test described above.
+
+4. **Layout tests** (`e2e/workout-layout.spec.ts`, `npx pnpm exec playwright test`): WebKit at iPhone viewports, which is the only way to check the one-screen constraint that keeps regressing. `e2e/fixtures.ts` intercepts `**/api/trpc/**` and answers by procedure name, so the logged-in app renders with no session and no database. **Unknown procedure names return `null`** — when you add a query the app calls on load, add it to `RESPONSES` too, or the test passes through a fallback path instead of the real one.
 
 Path aliases `@/*` → `client/src/*` and `@shared/*` → `shared/*` are defined in three places (`tsconfig.json`, `vite.config.ts`, `vitest.config.ts`) and must stay in sync.
 
