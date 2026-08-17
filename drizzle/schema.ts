@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, integer, pgEnum, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const sessionActionEnum = pgEnum("sessionAction", ["completed", "skipped"]);
@@ -18,6 +18,26 @@ export const users = pgTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+/**
+ * Modalidade de treino. `grammar` é JSON porque é configuração declarativa —
+ * normalizá-la em tabelas custaria joins em toda leitura para um dado que é
+ * sempre lido inteiro e nunca consultado por campo.
+ */
+export const modalities = pgTable("modalities", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  slug: varchar("slug", { length: 64 }).notNull(),
+  name: varchar("name", { length: 64 }).notNull(),
+  color: varchar("color", { length: 16 }).notNull(),
+  icon: varchar("icon", { length: 32 }).notNull(),
+  grammar: text("grammar").notNull(),
+  builtIn: boolean("builtIn").notNull().default(false),
+  archived: boolean("archived").notNull().default(false),
+  orderIndex: integer("orderIndex").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
 export const workouts = pgTable("workouts", {
   id: serial("id").primaryKey(),
   userId: integer("userId").notNull(),
@@ -25,6 +45,7 @@ export const workouts = pgTable("workouts", {
   focus: text("focus"),
   level: varchar("level", { length: 64 }),
   category: varchar("category", { length: 32 }),
+  modalityId: integer("modalityId"),
   suggestedDate: timestamp("suggestedDate"),
   notes: text("notes"),
   orderIndex: integer("orderIndex").notNull().default(0),
@@ -39,6 +60,9 @@ export const workoutSections = pgTable("workoutSections", {
   workoutId: integer("workoutId").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   format: varchar("format", { length: 64 }),
+  // Semântica do bloco, derivada de `format` na migração. Guia como o
+  // sequenciador cronometra a seção.
+  kind: varchar("kind", { length: 32 }),
   notes: text("notes"),
   orderIndex: integer("orderIndex").notNull().default(0),
 });
@@ -91,3 +115,4 @@ export type WorkoutSection = typeof workoutSections.$inferSelect;
 export type WorkoutExercise = typeof workoutExercises.$inferSelect;
 export type WorkoutSession = typeof workoutSessions.$inferSelect;
 export type WorkoutDraft = typeof workoutDrafts.$inferSelect;
+export type Modality = typeof modalities.$inferSelect;

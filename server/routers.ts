@@ -4,7 +4,7 @@ import { isWorkoutCategory } from "@shared/categories";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createWorkout, deleteDraft, deleteWorkout, ensureDefaultWorkouts, getDraft, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, recordSession, renameWorkout, saveDraft, setUserCategory, updateWorkoutOrder } from "./db";
+import { createWorkout, deleteDraft, deleteWorkout, ensureDefaultWorkouts, getDraft, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, ensureModalities, backfillSectionKinds, getModalities, recordSession, renameWorkout, saveDraft, setUserCategory, updateWorkoutOrder } from "./db";
 import { storagePut } from "./storage";
 import { isCatalogExercise, isFocusArea } from "@shared/exerciseCatalog";
 import { extractWorkoutFromPdf, generateWorkout } from "./llm";
@@ -13,7 +13,7 @@ import { buildWorkoutPdf } from "./workoutPdf";
 const exerciseSchema = z.object({ name: z.string(), prescription: z.string().optional(), sets: z.string().optional(), reps: z.string().optional(), duration: z.string().optional(), load: z.string().optional(), notes: z.string().optional() });
 const categorySchema = z.string().refine(isWorkoutCategory, "categoria inválida");
 const sectionSchema = z.object({ title: z.string(), format: z.string().optional(), notes: z.string().optional(), exercises: z.array(exerciseSchema).default([]) });
-export const workoutSchema = z.object({ title: z.string().min(1), focus: z.string().optional(), level: z.string().optional(), category: categorySchema.optional(), suggestedDate: z.coerce.date().optional(), notes: z.string().optional(), sections: z.array(sectionSchema).default([]), sourceFileKey: z.string().optional(), sourceFileName: z.string().optional() });
+export const workoutSchema = z.object({ title: z.string().min(1), modalityId: z.number().int().positive().optional(), focus: z.string().optional(), level: z.string().optional(), category: categorySchema.optional(), suggestedDate: z.coerce.date().optional(), notes: z.string().optional(), sections: z.array(sectionSchema).default([]), sourceFileKey: z.string().optional(), sourceFileName: z.string().optional() });
 
 export const appRouter = router({
   system: systemRouter,
@@ -22,7 +22,14 @@ export const appRouter = router({
     logout: publicProcedure.mutation(({ ctx }) => { const cookieOptions = getSessionCookieOptions(ctx.req); ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 }); return { success: true } as const; }),
   }),
   workouts: router({
-    list: protectedProcedure.query(({ ctx }) => ensureDefaultWorkouts(ctx.user.id)),
+    list: protectedProcedure.query(async ({ ctx }) => {
+      // Migração oportunista: garante modalidades e deriva os kinds antes de
+      // devolver a fila. Idempotente, então roda sem custo quando já está feito.
+      await ensureModalities(ctx.user.id);
+      await backfillSectionKinds(ctx.user.id);
+      return ensureDefaultWorkouts(ctx.user.id);
+    }),
+    modalities: protectedProcedure.query(({ ctx }) => getModalities(ctx.user.id)),
     history: protectedProcedure.query(({ ctx }) => getSessionHistory(ctx.user.id)),
     sectionTitles: protectedProcedure.query(({ ctx }) => getSectionTitles(ctx.user.id)),
     get: protectedProcedure.input(z.object({ id: z.number() })).query(({ ctx, input }) => getWorkoutForUser(ctx.user.id, input.id)),

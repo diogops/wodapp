@@ -1,9 +1,10 @@
 import path from "node:path";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { InsertUser, users, workoutDrafts, workouts, workoutExercises, workoutSections, workoutSessions } from "../drizzle/schema";
+import { InsertUser, modalities, users, workoutDrafts, workouts, workoutExercises, workoutSections, workoutSessions } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { BUILT_IN_MODALITIES, DEFAULT_MODALITY_SLUG, inferBlockKind } from '@shared/modalities';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -81,6 +82,75 @@ export async function getUserByOpenId(openId: string) {
   return result[0];
 }
 
+/**
+ * Garante as modalidades embutidas e associa a CrossFit todo workout que ainda
+ * não tem modalidade. Idempotente: roda a cada listagem e não faz nada quando
+ * já está em dia — foi a forma de migrar sem exigir nenhum passo do usuário.
+ */
+export async function ensureModalities(userId: number) {
+  const db = await getDb();
+  const existing = await db.select().from(modalities).where(eq(modalities.userId, userId));
+  const bySlug = new Map(existing.map(row => [row.slug, row]));
+
+  const missing = BUILT_IN_MODALITIES.filter(seed => !bySlug.has(seed.slug));
+  if (missing.length) {
+    const inserted = await db
+      .insert(modalities)
+      .values(
+        missing.map((seed, index) => ({
+          userId,
+          slug: seed.slug,
+          name: seed.name,
+          color: seed.color,
+          icon: seed.icon,
+          grammar: JSON.stringify(seed.grammar),
+          builtIn: true,
+          orderIndex: BUILT_IN_MODALITIES.findIndex(s => s.slug === seed.slug),
+        }))
+      )
+      .returning();
+    for (const row of inserted) bySlug.set(row.slug, row);
+  }
+
+  const crossfit = bySlug.get(DEFAULT_MODALITY_SLUG);
+  if (crossfit) {
+    // Backfill: workouts anteriores à multimodalidade pertencem a CrossFit.
+    await db
+      .update(workouts)
+      .set({ modalityId: crossfit.id })
+      .where(and(eq(workouts.userId, userId), isNull(workouts.modalityId)));
+  }
+
+  return [...bySlug.values()].sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id);
+}
+
+export async function getModalities(userId: number) {
+  return ensureModalities(userId);
+}
+
+/**
+ * Deriva `kind` das seções que ainda não têm, a partir do `format` livre.
+ * Separado do backfill de modalidade porque pode não haver correspondência —
+ * seções sem sinal ficam com kind nulo em vez de receber um chute.
+ */
+export async function backfillSectionKinds(userId: number) {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: workoutSections.id, title: workoutSections.title, format: workoutSections.format })
+    .from(workoutSections)
+    .innerJoin(workouts, eq(workoutSections.workoutId, workouts.id))
+    .where(and(eq(workouts.userId, userId), isNull(workoutSections.kind)));
+
+  let updated = 0;
+  for (const row of rows) {
+    const kind = inferBlockKind(row.format, row.title);
+    if (!kind) continue;
+    await db.update(workoutSections).set({ kind }).where(eq(workoutSections.id, row.id));
+    updated++;
+  }
+  return updated;
+}
+
 export async function getWorkoutsForUser(userId: number) {
   const db = await getDb();
   if (!db) return [];
@@ -137,10 +207,10 @@ export async function ensureDefaultWorkouts(userId: number) {
   return getWorkoutsForUser(userId);
 }
 
-export async function createWorkout(data: { userId: number; title: string; focus?: string; level?: string; category?: string; suggestedDate?: Date; notes?: string; orderIndex: number; sourceFileKey?: string; sourceFileName?: string; sections: Array<{ title: string; format?: string; notes?: string; exercises: Array<{ name: string; prescription?: string; sets?: string; reps?: string; duration?: string; load?: string; notes?: string }> }> }) {
+export async function createWorkout(data: { userId: number; title: string; focus?: string; level?: string; category?: string; modalityId?: number; suggestedDate?: Date; notes?: string; orderIndex: number; sourceFileKey?: string; sourceFileName?: string; sections: Array<{ title: string; format?: string; notes?: string; exercises: Array<{ name: string; prescription?: string; sets?: string; reps?: string; duration?: string; load?: string; notes?: string }> }> }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const inserted = await db.insert(workouts).values({ ...data, suggestedDate: data.suggestedDate ?? null, category: data.category ?? null, sourceFileKey: data.sourceFileKey ?? null, sourceFileName: data.sourceFileName ?? null }).returning({ id: workouts.id });
+  const inserted = await db.insert(workouts).values({ ...data, suggestedDate: data.suggestedDate ?? null, category: data.category ?? null, modalityId: data.modalityId ?? null, sourceFileKey: data.sourceFileKey ?? null, sourceFileName: data.sourceFileName ?? null }).returning({ id: workouts.id });
   const workoutId = inserted[0]?.id;
   if (!workoutId) throw new Error("Workout was not created");
   for (let sectionIndex = 0; sectionIndex < data.sections.length; sectionIndex++) {

@@ -231,20 +231,47 @@ export default function Home() {
   const historyQuery = trpc.workouts.history.useQuery(undefined, {
     enabled: Boolean(user),
   });
+  const modalitiesQuery = trpc.workouts.modalities.useQuery(undefined, { enabled: Boolean(user) });
+  const modalities = modalitiesQuery.data ?? [];
+  // Modalidade escolhida fica no cliente: é filtro de visualização, não um dado
+  // do treino. Vazio = todas, que é o comportamento de quem só usa CrossFit.
+  const [modalityFilter, setModalityFilter] = useState<number | null>(() => {
+    try {
+      const raw = localStorage.getItem("wodapp:modality");
+      return raw ? Number(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const changeModality = (id: number | null) => {
+    setModalityFilter(id);
+    setSelectedIndex(-1);
+    try {
+      if (id === null) localStorage.removeItem("wodapp:modality");
+      else localStorage.setItem("wodapp:modality", String(id));
+    } catch {}
+  };
   const allWorkouts = workoutsQuery.data ?? [];
   // Filtro por categoria do atleta. Workout sem categoria continua visível:
   // os treinos que existiam antes da categorização não podem sumir da fila.
+  const modalityMatches = useMemo(
+    () =>
+      modalityFilter === null
+        ? allWorkouts
+        : allWorkouts.filter(workout => workout.modalityId === modalityFilter),
+    [allWorkouts, modalityFilter]
+  );
   const categoryMatches = useMemo(
     () =>
       user?.category
-        ? allWorkouts.filter(workout => !workout.category || workout.category === user.category)
-        : allWorkouts,
-    [allWorkouts, user?.category]
+        ? modalityMatches.filter(workout => !workout.category || workout.category === user.category)
+        : modalityMatches,
+    [modalityMatches, user?.category]
   );
   // Se o filtro não sobrar nada, mostra tudo e avisa — ficar sem treino é pior
   // que ver um de outra categoria, mas o usuário precisa saber que isso ocorreu.
-  const categoryFallback = Boolean(user?.category) && categoryMatches.length === 0 && allWorkouts.length > 0;
-  const workouts = categoryFallback ? allWorkouts : categoryMatches;
+  const categoryFallback = Boolean(user?.category) && categoryMatches.length === 0 && modalityMatches.length > 0;
+  const workouts = categoryFallback ? modalityMatches : categoryMatches;
   const history = historyQuery.data ?? [];
   const completedIds = useMemo(
     () =>
@@ -432,6 +459,27 @@ export default function Home() {
                 <Bell className="h-4 w-4" />
                 <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#e06b3c]" />
               </Button>
+            )}
+            {modalities.length > 1 && (
+              <Select
+                value={modalityFilter === null ? "all" : String(modalityFilter)}
+                onValueChange={value => changeModality(value === "all" ? null : Number(value))}
+              >
+                <SelectTrigger
+                  className="h-8 w-[8.5rem] border-[#dedfd6] bg-white text-xs"
+                  aria-label="Modalidade"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {modalities.map(modality => (
+                    <SelectItem key={modality.id} value={String(modality.id)}>
+                      {modality.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
             <Select
               value={user.category ?? undefined}

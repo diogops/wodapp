@@ -15,6 +15,9 @@ const dbMocks = vi.hoisted(() => ({
   deleteDraft: vi.fn(),
   renameWorkout: vi.fn(),
   getSectionTitles: vi.fn(),
+  ensureModalities: vi.fn(),
+  backfillSectionKinds: vi.fn(),
+  getModalities: vi.fn(),
 }));
 const storageMocks = vi.hoisted(() => ({ storagePut: vi.fn() }));
 const llmMocks = vi.hoisted(() => ({ extractWorkoutFromPdf: vi.fn(), generateWorkout: vi.fn() }));
@@ -40,10 +43,15 @@ describe("workouts procedures", () => {
 
   it("lists workouts and reorders them for the authenticated user", async () => {
     dbMocks.ensureDefaultWorkouts.mockResolvedValue([workout]);
+    dbMocks.ensureModalities.mockResolvedValue([]);
+    dbMocks.backfillSectionKinds.mockResolvedValue(0);
     const caller = appRouter.createCaller(ctx);
     expect(await caller.workouts.list()).toEqual([workout]);
     await caller.workouts.reorder({ ids: [12, 13] });
     expect(dbMocks.updateWorkoutOrder).toHaveBeenCalledWith(7, [12, 13]);
+    // A migração roda junto da listagem, sem passo manual do usuário.
+    expect(dbMocks.ensureModalities).toHaveBeenCalledWith(7);
+    expect(dbMocks.backfillSectionKinds).toHaveBeenCalledWith(7);
   });
 
   it("records completed and skipped sessions with a workout snapshot", async () => {
