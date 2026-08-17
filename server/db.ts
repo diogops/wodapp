@@ -2,7 +2,7 @@ import path from "node:path";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { InsertUser, modalities, users, workoutDrafts, workouts, workoutExercises, workoutSections, workoutSessions } from "../drizzle/schema";
+import { InsertUser, modalities, users, workoutDrafts, workoutSetLogs, workouts, workoutExercises, workoutSections, workoutSessions } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { BUILT_IN_MODALITIES, DEFAULT_MODALITY_SLUG, inferBlockKind } from '@shared/modalities';
 
@@ -207,7 +207,7 @@ export async function ensureDefaultWorkouts(userId: number) {
   return getWorkoutsForUser(userId);
 }
 
-export async function createWorkout(data: { userId: number; title: string; focus?: string; level?: string; category?: string; modalityId?: number; suggestedDate?: Date; notes?: string; orderIndex: number; sourceFileKey?: string; sourceFileName?: string; sections: Array<{ title: string; format?: string; notes?: string; exercises: Array<{ name: string; prescription?: string; sets?: string; reps?: string; duration?: string; load?: string; notes?: string }> }> }) {
+export async function createWorkout(data: { userId: number; title: string; focus?: string; level?: string; category?: string; modalityId?: number; suggestedDate?: Date; notes?: string; orderIndex: number; sourceFileKey?: string; sourceFileName?: string; sections: Array<{ title: string; format?: string; kind?: string | null; notes?: string; exercises: Array<{ name: string; prescription?: string; sets?: string; reps?: string; duration?: string; load?: string; notes?: string }> }> }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const inserted = await db.insert(workouts).values({ ...data, suggestedDate: data.suggestedDate ?? null, category: data.category ?? null, modalityId: data.modalityId ?? null, sourceFileKey: data.sourceFileKey ?? null, sourceFileName: data.sourceFileName ?? null }).returning({ id: workouts.id });
@@ -215,12 +215,63 @@ export async function createWorkout(data: { userId: number; title: string; focus
   if (!workoutId) throw new Error("Workout was not created");
   for (let sectionIndex = 0; sectionIndex < data.sections.length; sectionIndex++) {
     const section = data.sections[sectionIndex];
-    const sectionInsert = await db.insert(workoutSections).values({ workoutId, title: section.title, format: section.format ?? null, notes: section.notes ?? null, orderIndex: sectionIndex }).returning({ id: workoutSections.id });
+    const sectionInsert = await db.insert(workoutSections).values({ workoutId, title: section.title, format: section.format ?? null, kind: section.kind ?? inferBlockKind(section.format, section.title), notes: section.notes ?? null, orderIndex: sectionIndex }).returning({ id: workoutSections.id });
     const sectionId = sectionInsert[0]?.id;
     if (!sectionId) continue;
     if (section.exercises.length) await db.insert(workoutExercises).values(section.exercises.map((exercise, index) => ({ ...exercise, sectionId, orderIndex: index })));
   }
   return getWorkoutForUser(data.userId, workoutId);
+}
+
+/**
+ * Grava uma série executada e devolve a carga anterior daquele exercício, que
+ * é o que alimenta a sugestão da próxima. Uma chamada só: durante o treino,
+ * cada ida ao servidor é atrito.
+ */
+export async function logSet(data: {
+  userId: number;
+  workoutId: number;
+  exerciseName: string;
+  setIndex: number;
+  reps?: number;
+  load?: string;
+  rpe?: number;
+}) {
+  const db = await getDb();
+  await db.insert(workoutSetLogs).values({
+    userId: data.userId,
+    workoutId: data.workoutId,
+    exerciseName: data.exerciseName,
+    setIndex: data.setIndex,
+    reps: data.reps ?? null,
+    load: data.load ?? null,
+    rpe: data.rpe ?? null,
+  });
+  return { ok: true as const };
+}
+
+/**
+ * Última carga registrada por exercício, para pré-preencher o campo. Devolve um
+ * mapa porque a tela de treino precisa de todos os exercícios de uma vez.
+ */
+export async function getLastLoads(userId: number, exerciseNames: string[]) {
+  if (!exerciseNames.length) return {} as Record<string, string>;
+  const db = await getDb();
+  const rows = await db
+    .select({
+      exerciseName: workoutSetLogs.exerciseName,
+      load: workoutSetLogs.load,
+      completedAt: workoutSetLogs.completedAt,
+    })
+    .from(workoutSetLogs)
+    .where(and(eq(workoutSetLogs.userId, userId), inArray(workoutSetLogs.exerciseName, exerciseNames)))
+    .orderBy(desc(workoutSetLogs.completedAt));
+
+  const latest: Record<string, string> = {};
+  for (const row of rows) {
+    if (row.load && !(row.exerciseName in latest)) latest[row.exerciseName] = row.load;
+  }
+  return latest;
 }
 
 export async function recordSession(

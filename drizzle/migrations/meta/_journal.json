@@ -36,6 +36,13 @@
       "when": 1786984485810,
       "tag": "0004_cool_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786989777243,
+      "tag": "0005_dusty_rictor",
+      "breakpoints": true
     }
   ]
 }

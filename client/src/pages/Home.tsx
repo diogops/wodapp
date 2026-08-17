@@ -11,6 +11,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { SurpriseWodDialog } from "@/components/SurpriseWodDialog";
 import { DraftWodPanel } from "@/components/DraftWodPanel";
 import { SectionTitleSelect } from "@/components/SectionTitleSelect";
+import { SetTracker } from "@/components/SetTracker";
+import { parseSetPlan } from "@/lib/straightSets";
 import {
   Select,
   SelectContent,
@@ -19,6 +21,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { WORKOUT_CATEGORIES } from "@shared/categories";
+import { BLOCK_KINDS, type BlockKind } from "@shared/modalities";
+
+/** Rótulos em português para os tipos de bloco, que no dado são slugs. */
+const BLOCK_KIND_LABELS: Record<BlockKind, string> = {
+  warmup: "Aquecimento",
+  skill: "Técnica",
+  straight_sets: "Séries (musculação)",
+  superset: "Superssérie",
+  circuit: "Circuito",
+  for_time: "For Time",
+  amrap: "AMRAP",
+  emom: "EMOM",
+  tabata: "Tabata",
+  intervals: "Intervalado",
+  hold: "Isometria",
+  distance: "Distância",
+  cooldown: "Volta à calma",
+  rest: "Descanso",
+};
 import { trpc } from "@/lib/trpc";
 import {
   Bell,
@@ -872,6 +893,16 @@ function Today({
 
   const nextExercise = timer ? findNextExercise(flatExercises, timer.exerciseId, doneExercises) : null;
 
+  // Só busca cargas anteriores quando o treino tem bloco de séries; em CrossFit
+  // puro isso seria uma chamada sem uso a cada abertura.
+  const hasStraightSets = (current?.sections ?? []).some((section: any) => section.kind === "straight_sets");
+  const lastLoadsQuery = trpc.workouts.lastLoads.useQuery(
+    { exerciseNames: flatExercises.map(exercise => exercise.name) },
+    { enabled: hasStraightSets && flatExercises.length > 0 }
+  );
+  const lastLoads = lastLoadsQuery.data ?? {};
+  const logSet = trpc.workouts.logSet.useMutation();
+
   // Clique fora fecha. Enquanto corre, pausa antes de fechar — um toque
   // acidental no meio do treino não pode custar a contagem.
   const onBackdropClick = () => {
@@ -978,8 +1009,36 @@ function Today({
                     </span>
                   )}
                 </div>
+                {section.kind === "straight_sets"
+                  ? (section.exercises ?? []).map((exercise: any) => {
+                      const plan = parseSetPlan(exercise);
+                      if (!plan) return null;
+                      const exerciseId = String(exercise.id);
+                      return (
+                        <SetTracker
+                          key={`sets-${exercise.id}`}
+                          exerciseName={exercise.name}
+                          plan={plan}
+                          suggestedLoad={lastLoads[exercise.name] ?? exercise.load ?? undefined}
+                          onLogSet={entry =>
+                            current &&
+                            logSet.mutate({
+                              workoutId: current.id,
+                              exerciseName: exercise.name,
+                              setIndex: entry.setIndex,
+                              load: entry.load,
+                            })
+                          }
+                          onFinish={() => markDone(exerciseId)}
+                        />
+                      );
+                    })
+                  : null}
                 {section.exercises?.map((exercise: any) => {
                   const exerciseId = String(exercise.id);
+                  // O SetTracker já cuida deste exercício quando o bloco é de
+                  // séries; mostrar as duas formas confundiria o que registrar.
+                  if (section.kind === "straight_sets" && parseSetPlan(exercise)) return null;
                   const seconds = parseDurationToSeconds(exercise.duration, exercise.prescription);
                   const done = doneExercises.has(exerciseId);
                   const paused = timer?.exerciseId === exerciseId && timer.status === "paused";
@@ -1515,7 +1574,7 @@ function CreateWorkout({ value, setValue, busy, onClose, onCreate, sectionTitleO
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between"><Label>Seções e exercícios</Label><Button type="button" variant="outline" size="sm" onClick={() => setSections([...sections, { title: "", format: "", notes: "", exercises: [] }])}><Plus className="mr-1 h-3 w-3" />Seção</Button></div>
-            {sections.map((section: any, sectionIndex: number) => <div key={sectionIndex} className="rounded-xl border border-[#dedfd6] bg-white p-3 space-y-3"><div className="flex gap-2"><div className="min-w-0 flex-1"><SectionTitleSelect value={section.title || ""} options={sectionTitleOptions} onChange={(title: string) => { const next = [...sections]; next[sectionIndex] = { ...section, title }; setSections(next); }} /></div><Button type="button" variant="ghost" size="icon" disabled={sectionIndex === 0} onClick={() => { const next = [...sections]; [next[sectionIndex - 1], next[sectionIndex]] = [next[sectionIndex], next[sectionIndex - 1]]; setSections(next); }}><ArrowUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" disabled={sectionIndex === sections.length - 1} onClick={() => { const next = [...sections]; [next[sectionIndex], next[sectionIndex + 1]] = [next[sectionIndex + 1], next[sectionIndex]]; setSections(next); }}><ArrowDown className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" className="text-[#b14a35]" onClick={() => setSections(sections.filter((_: any, index: number) => index !== sectionIndex))}><Trash2 className="h-4 w-4" /></Button></div><Input value={section.format || ""} onChange={event => { const next = [...sections]; next[sectionIndex] = { ...section, format: event.target.value }; setSections(next); }} placeholder="Formato (ex.: EMOM, AMRAP, força)" />{(section.exercises || []).map((exercise: any, exerciseIndex: number) => <div key={exerciseIndex} className="rounded-lg bg-[#f1f1eb] p-3 space-y-2"><div className="flex gap-2"><Input value={exercise.name || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, name: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Exercício" /><Button type="button" variant="ghost" size="icon" disabled={exerciseIndex === 0} onClick={() => { const next = [...sections]; const exercises = [...(section.exercises || [])]; [exercises[exerciseIndex - 1], exercises[exerciseIndex]] = [exercises[exerciseIndex], exercises[exerciseIndex - 1]]; next[sectionIndex] = { ...section, exercises }; setSections(next); }}><ArrowUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" disabled={exerciseIndex === (section.exercises || []).length - 1} onClick={() => { const next = [...sections]; const exercises = [...(section.exercises || [])]; [exercises[exerciseIndex], exercises[exerciseIndex + 1]] = [exercises[exerciseIndex + 1], exercises[exerciseIndex]]; next[sectionIndex] = { ...section, exercises }; setSections(next); }}><ArrowDown className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" onClick={() => { const next = [...sections]; next[sectionIndex] = { ...section, exercises: section.exercises.filter((_: any, index: number) => index !== exerciseIndex) }; setSections(next); }}><Trash2 className="h-4 w-4" /></Button></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[["sets","Séries"],["reps","Reps"],["duration","Tempo"],["load","Carga"]].map(([field, label]) => <Input key={field} value={exercise[field] || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, [field]: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder={label} />)}</div><Input value={exercise.prescription || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, prescription: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Prescrição / observação do exercício" /><Textarea value={exercise.notes || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, notes: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Notas do exercício" /></div>)}<Button type="button" variant="outline" size="sm" onClick={() => { const next = [...sections]; next[sectionIndex] = { ...section, exercises: [...(section.exercises || []), { name: "", prescription: "", sets: "", reps: "", duration: "", load: "", notes: "" }] }; setSections(next); }}><Plus className="mr-1 h-3 w-3" />Exercício</Button><Textarea value={section.notes || ""} onChange={event => { const next = [...sections]; next[sectionIndex] = { ...section, notes: event.target.value }; setSections(next); }} placeholder="Notas da seção" /></div>)}{invalid && <p className="text-xs text-[#b14a35]">Cada seção precisa de nome; cada exercício precisa de nome e prescrição ou ao menos uma métrica (séries, reps, tempo ou carga).</p>}</div>
+            {sections.map((section: any, sectionIndex: number) => <div key={sectionIndex} className="rounded-xl border border-[#dedfd6] bg-white p-3 space-y-3"><div className="flex gap-2"><div className="min-w-0 flex-1"><SectionTitleSelect value={section.title || ""} options={sectionTitleOptions} onChange={(title: string) => { const next = [...sections]; next[sectionIndex] = { ...section, title }; setSections(next); }} /></div><Button type="button" variant="ghost" size="icon" disabled={sectionIndex === 0} onClick={() => { const next = [...sections]; [next[sectionIndex - 1], next[sectionIndex]] = [next[sectionIndex], next[sectionIndex - 1]]; setSections(next); }}><ArrowUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" disabled={sectionIndex === sections.length - 1} onClick={() => { const next = [...sections]; [next[sectionIndex], next[sectionIndex + 1]] = [next[sectionIndex + 1], next[sectionIndex]]; setSections(next); }}><ArrowDown className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" className="text-[#b14a35]" onClick={() => setSections(sections.filter((_: any, index: number) => index !== sectionIndex))}><Trash2 className="h-4 w-4" /></Button></div><div className="flex gap-2"><Input className="flex-1" value={section.format || ""} onChange={event => { const next = [...sections]; next[sectionIndex] = { ...section, format: event.target.value }; setSections(next); }} placeholder="Formato (ex.: EMOM, AMRAP, força)" /><Select value={section.kind || "auto"} onValueChange={value => { const next = [...sections]; next[sectionIndex] = { ...section, kind: value === "auto" ? null : value }; setSections(next); }}><SelectTrigger className="w-[9.5rem] bg-white" aria-label="Tipo de bloco"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="auto">Automático</SelectItem>{BLOCK_KINDS.map(kind => <SelectItem key={kind} value={kind}>{BLOCK_KIND_LABELS[kind]}</SelectItem>)}</SelectContent></Select></div>{(section.exercises || []).map((exercise: any, exerciseIndex: number) => <div key={exerciseIndex} className="rounded-lg bg-[#f1f1eb] p-3 space-y-2"><div className="flex gap-2"><Input value={exercise.name || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, name: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Exercício" /><Button type="button" variant="ghost" size="icon" disabled={exerciseIndex === 0} onClick={() => { const next = [...sections]; const exercises = [...(section.exercises || [])]; [exercises[exerciseIndex - 1], exercises[exerciseIndex]] = [exercises[exerciseIndex], exercises[exerciseIndex - 1]]; next[sectionIndex] = { ...section, exercises }; setSections(next); }}><ArrowUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" disabled={exerciseIndex === (section.exercises || []).length - 1} onClick={() => { const next = [...sections]; const exercises = [...(section.exercises || [])]; [exercises[exerciseIndex], exercises[exerciseIndex + 1]] = [exercises[exerciseIndex + 1], exercises[exerciseIndex]]; next[sectionIndex] = { ...section, exercises }; setSections(next); }}><ArrowDown className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" onClick={() => { const next = [...sections]; next[sectionIndex] = { ...section, exercises: section.exercises.filter((_: any, index: number) => index !== exerciseIndex) }; setSections(next); }}><Trash2 className="h-4 w-4" /></Button></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[["sets","Séries"],["reps","Reps"],["duration","Tempo"],["load","Carga"]].map(([field, label]) => <Input key={field} value={exercise[field] || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, [field]: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder={label} />)}</div><Input value={exercise.prescription || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, prescription: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Prescrição / observação do exercício" /><Textarea value={exercise.notes || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, notes: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Notas do exercício" /></div>)}<Button type="button" variant="outline" size="sm" onClick={() => { const next = [...sections]; next[sectionIndex] = { ...section, exercises: [...(section.exercises || []), { name: "", prescription: "", sets: "", reps: "", duration: "", load: "", notes: "" }] }; setSections(next); }}><Plus className="mr-1 h-3 w-3" />Exercício</Button><Textarea value={section.notes || ""} onChange={event => { const next = [...sections]; next[sectionIndex] = { ...section, notes: event.target.value }; setSections(next); }} placeholder="Notas da seção" /></div>)}{invalid && <p className="text-xs text-[#b14a35]">Cada seção precisa de nome; cada exercício precisa de nome e prescrição ou ao menos uma métrica (séries, reps, tempo ou carga).</p>}</div>
           <Button
             className="w-full bg-[#e06b3c] text-white hover:bg-[#c8562c]"
             disabled={!value.title.trim() || busy || invalid}

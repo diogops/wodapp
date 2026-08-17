@@ -95,6 +95,23 @@ export const workoutDrafts = pgTable("workoutDrafts", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
 });
 
+/**
+ * Registro real de cada série executada. Fica fora do snapshot da sessão
+ * porque é consultado por exercício ao longo do tempo — é daqui que sai a
+ * sugestão de carga ("última usada") e a evolução por movimento.
+ */
+export const workoutSetLogs = pgTable("workoutSetLogs", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  workoutId: integer("workoutId").notNull(),
+  exerciseName: varchar("exerciseName", { length: 255 }).notNull(),
+  setIndex: integer("setIndex").notNull(),
+  reps: integer("reps"),
+  load: varchar("load", { length: 32 }),
+  rpe: integer("rpe"),
+  completedAt: timestamp("completedAt").defaultNow().notNull(),
+});
+
 export const workoutSessions = pgTable("workoutSessions", {
   id: serial("id").primaryKey(),
   userId: integer("userId").notNull(),
@@ -116,3 +133,4 @@ export type WorkoutExercise = typeof workoutExercises.$inferSelect;
 export type WorkoutSession = typeof workoutSessions.$inferSelect;
 export type WorkoutDraft = typeof workoutDrafts.$inferSelect;
 export type Modality = typeof modalities.$inferSelect;
+export type WorkoutSetLog = typeof workoutSetLogs.$inferSelect;
