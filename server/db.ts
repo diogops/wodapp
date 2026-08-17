@@ -207,6 +207,20 @@ export async function deleteDraft(userId: number) {
   return true;
 }
 
+/**
+ * UPDATE de verdade, ao contrário de `workouts.update`, que apaga e recria e
+ * portanto troca o id — o que desliga o histórico de sessões daquele workout.
+ * Renomear é a operação mais comum, então merece preservar a identidade.
+ */
+export async function renameWorkout(userId: number, workoutId: number, title: string) {
+  const db = await getDb();
+  await db
+    .update(workouts)
+    .set({ title })
+    .where(and(eq(workouts.id, workoutId), eq(workouts.userId, userId)));
+  return getWorkoutForUser(userId, workoutId);
+}
+
 export async function deleteWorkout(userId: number, workoutId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");

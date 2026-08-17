@@ -5,6 +5,7 @@
 // do Zod antes de virar workout: JSON válido não é o mesmo que dado correto.
 
 import Anthropic from "@anthropic-ai/sdk";
+import { Mistral } from "@mistralai/mistralai";
 import { ENV } from "./_core/env";
 import { ocrPdfToMarkdown } from "./ocr";
 
@@ -78,13 +79,22 @@ const SYSTEM_PROMPT = [
 ].join(" ");
 
 let _client: Anthropic | null = null;
+let _mistral: Mistral | null = null;
 
 function getClient() {
   if (!_client) {
-    if (!ENV.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY não configurada: a importação de PDF depende dela");
+    if (!ENV.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY não configurada");
     _client = new Anthropic({ apiKey: ENV.anthropicApiKey });
   }
   return _client;
+}
+
+function getMistralClient() {
+  if (!_mistral) {
+    if (!ENV.mistralApiKey) throw new Error("MISTRAL_API_KEY não configurada");
+    _mistral = new Mistral({ apiKey: ENV.mistralApiKey });
+  }
+  return _mistral;
 }
 
 /**
@@ -96,17 +106,20 @@ function getClient() {
 export async function extractWorkoutFromPdf(pdfBase64: string): Promise<unknown> {
   const markdown = await ocrPdfToMarkdown(pdfBase64);
 
-  const userContent: Anthropic.ContentBlockParam[] = markdown
-    ? [
-        {
-          type: "text",
-          text: `Conteúdo do PDF transcrito por OCR:\n\n${markdown}\n\nConverta para o schema solicitado.`,
-        },
-      ]
-    : [
-        { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
-        { type: "text", text: "Converta este PDF para o schema solicitado." },
-      ];
+  // Com OCR o PDF já virou texto, então a estruturação passa pelo provedor
+  // configurado — normalmente o mais barato. Só o caminho sem OCR precisa da
+  // Anthropic, que é quem lê PDF nativamente.
+  if (markdown) {
+    return requestWorkout(
+      `Conteúdo do PDF transcrito por OCR:\n\n${markdown}\n\nConverta para o schema solicitado.`,
+      SYSTEM_PROMPT
+    );
+  }
+
+  const userContent: Anthropic.ContentBlockParam[] = [
+    { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
+    { type: "text", text: "Converta este PDF para o schema solicitado." },
+  ];
 
   const response = await getClient().messages.create({
     model: ENV.anthropicModel,
@@ -139,6 +152,7 @@ export type GenerateWorkoutInput = {
   exercises: string[];
   focusAreas: string[];
   notes?: string;
+  wishlist?: string;
   avoidTitles?: string[];
   previousWorkout?: unknown;
   changeRequest?: string;
@@ -168,6 +182,16 @@ export async function generateWorkout(input: GenerateWorkoutInput): Promise<unkn
     return requestWorkout(brief.join("\n"));
   }
 
+  // Wishlist em texto livre: o atleta escreve o que quer fazer e o modelo monta
+  // a sessão completa em volta. É requisito, não sugestão — o valor da função
+  // é justamente sair com tudo que ele pediu dentro.
+  if (input.wishlist?.trim()) {
+    brief.push(`O atleta escreveu os exercícios que quer fazer neste treino:\n${input.wishlist.trim()}`);
+    brief.push(
+      "TODOS os exercícios que ele citou precisam aparecer no workout final. Complete a sessão em volta deles: aquecimento, técnica quando fizer sentido, parte principal e finisher, além de movimentos complementares que equilibrem o estímulo."
+    );
+  }
+
   brief.push(
     input.exercises.length
       ? `Exercícios que o atleta escolheu: ${input.exercises.join(", ")}.`
@@ -189,11 +213,48 @@ export async function generateWorkout(input: GenerateWorkoutInput): Promise<unkn
   return requestWorkout(brief.join("\n"));
 }
 
-async function requestWorkout(prompt: string): Promise<unknown> {
+/**
+ * Despacha para o provedor configurado. Ambos restringem a saída ao mesmo
+ * JSON Schema, então trocar de provedor não muda o contrato — só o custo e a
+ * qualidade da programação.
+ */
+async function requestWorkout(prompt: string, system = GENERATOR_SYSTEM_PROMPT): Promise<unknown> {
+  return ENV.workoutLlmProvider === "anthropic"
+    ? requestWorkoutFromAnthropic(prompt, system)
+    : requestWorkoutFromMistral(prompt, system);
+}
+
+async function requestWorkoutFromMistral(prompt: string, system: string): Promise<unknown> {
+  const response = await getMistralClient().chat.complete({
+    model: ENV.mistralChatModel,
+    maxTokens: 8000,
+    responseFormat: {
+      type: "json_schema",
+      jsonSchema: { name: "workout", schemaDefinition: WORKOUT_JSON_SCHEMA, strict: true },
+    },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ],
+  });
+
+  const choice = response.choices?.[0];
+  if (choice?.finishReason === "length") throw new Error("O workout gerado ficou longo demais");
+
+  const content = choice?.message?.content;
+  const text = typeof content === "string"
+    ? content
+    : (content ?? []).map(chunk => (chunk.type === "text" ? chunk.text : "")).join("");
+
+  if (!text.trim()) throw new Error("O modelo não retornou um workout");
+  return JSON.parse(text);
+}
+
+async function requestWorkoutFromAnthropic(prompt: string, system: string): Promise<unknown> {
   const response = await getClient().messages.create({
     model: ENV.anthropicModel,
     max_tokens: 16000,
-    system: GENERATOR_SYSTEM_PROMPT,
+    system,
     output_config: {
       effort: "medium",
       format: { type: "json_schema", schema: WORKOUT_JSON_SCHEMA },

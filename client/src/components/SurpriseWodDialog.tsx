@@ -6,16 +6,17 @@ import {
   exercisesByCategory,
   type ExerciseCategory,
 } from "@shared/exerciseCatalog";
-import { Loader2, Sparkles, X } from "lucide-react";
+import { Loader2, PenLine, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 
 type Step = "ask" | "pick";
-type PickTab = "exercises" | "focus";
+type PickTab = "exercises" | "focus" | "wishlist";
 
 export type SurpriseWodSelection = {
   exercises: string[];
   focusAreas: string[];
   notes?: string;
+  wishlist?: string;
 };
 
 function toggle(list: string[], value: string) {
@@ -61,9 +62,10 @@ export function SurpriseWodDialog({
   const [exercises, setExercises] = useState<string[]>([]);
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [wishlist, setWishlist] = useState("");
   const [openCategory, setOpenCategory] = useState<ExerciseCategory>(EXERCISE_CATEGORIES[0]);
 
-  const total = exercises.length + focusAreas.length;
+  const total = exercises.length + focusAreas.length + (wishlist.trim() ? 1 : 0);
 
   return (
     <div className="fixed inset-0 z-[75] grid place-items-center bg-[#20231f]/70 p-4">
@@ -101,6 +103,17 @@ export function SurpriseWodDialog({
             <Button
               variant="outline"
               className="w-full justify-start"
+              onClick={() => {
+                setTab("wishlist");
+                setStep("pick");
+              }}
+            >
+              <PenLine className="mr-2 h-4 w-4" />
+              Escrever os exercícios que quero
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start"
               disabled={busy}
               onClick={() => onGenerate({ exercises: [], focusAreas: [] })}
             >
@@ -119,6 +132,7 @@ export function SurpriseWodDialog({
                 [
                   ["exercises", "Exercícios"],
                   ["focus", "O que trabalhar"],
+                  ["wishlist", "Escrever"],
                 ] as const
               ).map(([value, label]) => (
                 <button
@@ -138,7 +152,24 @@ export function SurpriseWodDialog({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {tab === "exercises" ? (
+              {tab === "wishlist" ? (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6d746a]">
+                    Exercícios que você quer neste treino
+                  </label>
+                  <Textarea
+                    className="mt-1.5 bg-white"
+                    rows={6}
+                    placeholder={"Um por linha, do seu jeito. Ex.:\nthruster\nbarra fixa\ncorrida 400m\nabdominal"}
+                    value={wishlist}
+                    onChange={event => setWishlist(event.target.value)}
+                  />
+                  <p className="mt-2 text-xs leading-5 text-[#6d746a]">
+                    Todos aparecem no workout. A IA monta o resto em volta —
+                    aquecimento, ordem dos blocos e movimentos complementares.
+                  </p>
+                </div>
+              ) : tab === "exercises" ? (
                 <div className="space-y-3">
                   <div className="flex flex-wrap gap-1.5">
                     {EXERCISE_CATEGORIES.map(category => (
@@ -195,7 +226,14 @@ export function SurpriseWodDialog({
               <Button
                 className="bg-[#e06b3c] text-white hover:bg-[#c8562c]"
                 disabled={busy}
-                onClick={() => onGenerate({ exercises, focusAreas, notes: notes.trim() || undefined })}
+                onClick={() =>
+                  onGenerate({
+                    exercises,
+                    focusAreas,
+                    notes: notes.trim() || undefined,
+                    wishlist: wishlist.trim() || undefined,
+                  })
+                }
               >
                 {busy ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

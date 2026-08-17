@@ -14,9 +14,16 @@ export const ENV = {
     .split(",")
     .map(email => email.trim().toLowerCase())
     .filter(Boolean),
+  googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
   anthropicModel: process.env.ANTHROPIC_MODEL ?? "claude-opus-5",
   // OCR opcional: sem a chave, a importação usa o PDF nativo da Anthropic.
   mistralApiKey: process.env.MISTRAL_API_KEY ?? "",
   mistralOcrModel: process.env.MISTRAL_OCR_MODEL ?? "mistral-ocr-latest",
+  // Gerador de workout. Mistral Medium custa US$0,40/US$2,00 por MTok contra
+  // US$5/US$25 do Opus 5 — ~12x mais barato para uma tarefa estruturada.
+  // Trocar para "anthropic" volta ao Claude sem mexer em código.
+  workoutLlmProvider: (process.env.WORKOUT_LLM_PROVIDER ?? "mistral").toLowerCase(),
+  mistralChatModel: process.env.MISTRAL_CHAT_MODEL ?? "mistral-medium-latest",
 };

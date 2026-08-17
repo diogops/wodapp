@@ -4,6 +4,7 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
+import { registerGoogleOAuthRoutes } from "./googleOauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { runMigrations } from "../db";
@@ -39,6 +40,7 @@ async function startServer() {
   app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  registerGoogleOAuthRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",

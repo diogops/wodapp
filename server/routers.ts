@@ -3,7 +3,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createWorkout, deleteDraft, deleteWorkout, ensureDefaultWorkouts, getDraft, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, recordSession, saveDraft, updateWorkoutOrder } from "./db";
+import { createWorkout, deleteDraft, deleteWorkout, ensureDefaultWorkouts, getDraft, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, recordSession, renameWorkout, saveDraft, updateWorkoutOrder } from "./db";
 import { storagePut } from "./storage";
 import { isCatalogExercise, isFocusArea } from "@shared/exerciseCatalog";
 import { extractWorkoutFromPdf, generateWorkout } from "./llm";
@@ -32,6 +32,9 @@ export const appRouter = router({
       await deleteWorkout(ctx.user.id, input.id);
       return created;
     }),
+    rename: protectedProcedure
+      .input(z.object({ id: z.number(), title: z.string().min(1).max(255) }))
+      .mutation(({ ctx, input }) => renameWorkout(ctx.user.id, input.id, input.title.trim())),
     remove: protectedProcedure.input(z.object({ id: z.number() })).mutation(({ ctx, input }) => deleteWorkout(ctx.user.id, input.id)),
     exportPdf: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
       const workout = await getWorkoutForUser(ctx.user.id, input.id);
@@ -60,6 +63,9 @@ export const appRouter = router({
         exercises: z.array(z.string()).max(30).default([]).transform(list => list.filter(isCatalogExercise)),
         focusAreas: z.array(z.string()).max(14).default([]).transform(list => list.filter(isFocusArea)),
         notes: z.string().max(500).optional(),
+        // Texto livre: o app é de um usuário só, então dirigir o próprio prompt
+        // é uso legítimo. O limite existe só para não estourar o contexto.
+        wishlist: z.string().max(1500).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const existing = await getWorkoutsForUser(ctx.user.id);
@@ -67,6 +73,7 @@ export const appRouter = router({
           exercises: input.exercises,
           focusAreas: input.focusAreas,
           notes: input.notes,
+          wishlist: input.wishlist,
           avoidTitles: existing.map(workout => workout.title).slice(0, 12),
         });
         // Persistido como rascunho: fechar a aba não pode descartar a proposta.

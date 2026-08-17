@@ -13,6 +13,8 @@ const dbMocks = vi.hoisted(() => ({
   saveDraft: vi.fn(),
   getDraft: vi.fn(),
   deleteDraft: vi.fn(),
+  renameWorkout: vi.fn(),
+  getSectionTitles: vi.fn(),
 }));
 const storageMocks = vi.hoisted(() => ({ storagePut: vi.fn() }));
 const llmMocks = vi.hoisted(() => ({ extractWorkoutFromPdf: vi.fn(), generateWorkout: vi.fn() }));
@@ -129,6 +131,37 @@ describe("workouts procedures", () => {
 
     expect(llmMocks.generateWorkout).toHaveBeenCalledWith(
       expect.objectContaining({ exercises: ["Thruster"], focusAreas: ["Cardio / motor"] })
+    );
+  });
+
+  it("renames in place instead of recreating, so session history keeps its workout", async () => {
+    dbMocks.renameWorkout.mockResolvedValue({ ...workout, title: "Novo nome" });
+
+    await appRouter.createCaller(ctx).workouts.rename({ id: 12, title: "  Novo nome  " });
+
+    expect(dbMocks.renameWorkout).toHaveBeenCalledWith(7, 12, "Novo nome");
+    // `update` apaga e recria, trocando o id — renomear não pode fazer isso.
+    expect(dbMocks.createWorkout).not.toHaveBeenCalled();
+    expect(dbMocks.deleteWorkout).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty rename", async () => {
+    await expect(appRouter.createCaller(ctx).workouts.rename({ id: 12, title: "" })).rejects.toThrow();
+    expect(dbMocks.renameWorkout).not.toHaveBeenCalled();
+  });
+
+  it("passes the free-text wishlist through to the generator", async () => {
+    dbMocks.getWorkoutsForUser.mockResolvedValue([]);
+    llmMocks.generateWorkout.mockResolvedValue({ title: "Com wishlist", focus: "", level: "", notes: "", sections: [] });
+
+    await appRouter.createCaller(ctx).workouts.generate({
+      wishlist: "thruster\nbarra fixa\ncorrida 400m",
+    });
+
+    // Texto livre aqui é intencional: o app é de um usuário só, então dirigir
+    // o próprio prompt é uso legítimo — ao contrário da seleção do catálogo.
+    expect(llmMocks.generateWorkout).toHaveBeenCalledWith(
+      expect.objectContaining({ wishlist: "thruster\nbarra fixa\ncorrida 400m" })
     );
   });
 

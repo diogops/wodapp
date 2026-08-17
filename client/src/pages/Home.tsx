@@ -1,5 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { startLogin } from "@/const";
+import { startGoogleLogin, startLogin } from "@/const";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,7 @@ import {
   History as HistoryIcon,
   Loader2,
   LogOut,
+  Mail,
   Pencil,
   Plus,
   Rows3,
@@ -33,6 +34,7 @@ import {
   Sparkles,
   Timer as TimerIcon,
   Trash2,
+  Type,
   X,
   ArrowUp,
   ArrowDown,
@@ -263,6 +265,15 @@ export default function Home() {
     },
   });
   const reorder = trpc.workouts.reorder.useMutation({ onSuccess: refresh });
+  // UPDATE de verdade no servidor: renomear preserva o id e, com ele, o
+  // histórico de sessões — ao contrário de `update`, que apaga e recria.
+  const rename = trpc.workouts.rename.useMutation({
+    onSuccess: () => {
+      refresh();
+      toast.success("Nome atualizado");
+    },
+    onError: error => toast.error(error.message),
+  });
   const exportPdf = trpc.workouts.exportPdf.useMutation({
     onSuccess: result => {
       // Sem endpoint de download direto: o PDF chega em base64 pelo tRPC e vira
@@ -470,6 +481,7 @@ export default function Home() {
               setSelectedIndex(index);
               setTab("today");
             }}
+            onRename={(id: number, title: string) => rename.mutate({ id, title })}
             onExportPdf={(id: number) => exportPdf.mutate({ id })}
             exportingId={exportPdf.isPending ? exportPdf.variables?.id : undefined}
           />
@@ -584,13 +596,23 @@ function Landing() {
             Seus workouts, na ordem certa, com o detalhe necessário para
             executar bem e voltar amanhã.
           </p>
-          <Button
-            onClick={() => startLogin()}
-            className="mt-8 bg-[#e06b3c] px-6 text-white hover:bg-[#c8562c]"
-          >
-            <Github className="mr-2 h-4 w-4" />
-            Entrar com GitHub
-          </Button>
+          <div className="mt-8 flex flex-col gap-2 sm:flex-row">
+            <Button
+              onClick={() => startGoogleLogin()}
+              className="bg-[#e06b3c] px-6 text-white hover:bg-[#c8562c]"
+            >
+              <Mail className="mr-2 h-4 w-4" />
+              Entrar com Google
+            </Button>
+            <Button
+              onClick={() => startLogin()}
+              variant="outline"
+              className="border-[#4c554b] bg-transparent px-6 text-[#f7f7f2] hover:bg-white/10"
+            >
+              <Github className="mr-2 h-4 w-4" />
+              Entrar com GitHub
+            </Button>
+          </div>
         </div>
         <p className="text-xs uppercase tracking-[0.18em] text-[#7e877c]">
           Mobile-first / Personal / Consistent
@@ -902,7 +924,8 @@ type LibraryView = "list" | "grid";
 
 const VIEW_STORAGE_KEY = "wodapp:library-view";
 
-function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, onExportPdf, exportingId }: any) {
+function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, onExportPdf, onRename, exportingId }: any) {
+  const [renaming, setRenaming] = useState<{ id: number; title: string } | null>(null);
   // Preferência de visualização persiste: trocar de aba ou recarregar não pode
   // devolver o usuário para o modo que ele não escolheu.
   const [view, setView] = useState<LibraryView>(() => {
@@ -971,6 +994,13 @@ function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, o
                     </p>
                   </button>
                   <div className="flex items-center justify-between border-t border-[#ecece6] pt-1">
+                    <IconAction
+                      label="Renomear"
+                      className="h-8 w-8"
+                      onClick={() => setRenaming({ id: workout.id, title: workout.title })}
+                    >
+                      <Type className="h-3.5 w-3.5" />
+                    </IconAction>
                     <IconAction label="Editar" className="h-8 w-8" onClick={() => onEdit(workout)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </IconAction>
@@ -1033,6 +1063,12 @@ function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, o
                   </p>
                 </button>
                 <div className="flex shrink-0 items-center">
+                  <IconAction
+                    label="Renomear"
+                    onClick={() => setRenaming({ id: workout.id, title: workout.title })}
+                  >
+                    <Type className="h-4 w-4" />
+                  </IconAction>
                   <IconAction label="Editar" onClick={() => onEdit(workout)}>
                     <Pencil className="h-4 w-4" />
                   </IconAction>
@@ -1064,6 +1100,46 @@ function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, o
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {renaming && (
+        <div className="fixed inset-0 z-[85] grid place-items-center bg-[#20231f]/70 p-4">
+          <div
+            className="w-full max-w-sm rounded-2xl bg-[#f7f7f2] p-4 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Renomear workout"
+          >
+            <h3 className="font-display text-lg font-semibold">Renomear workout</h3>
+            <Input
+              autoFocus
+              className="mt-3 bg-white"
+              value={renaming.title}
+              onChange={event => setRenaming({ ...renaming, title: event.target.value })}
+              onKeyDown={event => {
+                if (event.key === "Enter" && renaming.title.trim()) {
+                  onRename(renaming.id, renaming.title.trim());
+                  setRenaming(null);
+                }
+              }}
+            />
+            <div className="mt-3 flex gap-2">
+              <Button
+                className="flex-1 bg-[#e06b3c] text-white hover:bg-[#c8562c]"
+                disabled={!renaming.title.trim()}
+                onClick={() => {
+                  onRename(renaming.id, renaming.title.trim());
+                  setRenaming(null);
+                }}
+              >
+                Salvar
+              </Button>
+              <Button variant="ghost" onClick={() => setRenaming(null)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
