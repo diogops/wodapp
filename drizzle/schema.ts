@@ -73,6 +73,9 @@ export const workoutSessions = pgTable("workoutSessions", {
   workoutId: integer("workoutId").notNull(),
   action: sessionActionEnum("action").notNull(),
   performedAt: timestamp("performedAt").defaultNow().notNull(),
+  // Tempo cronometrado do WOD, quando o atleta usou o timer. Nulo quando ele
+  // apenas marcou como concluído sem cronometrar.
+  durationSeconds: integer("durationSeconds"),
   snapshot: text("snapshot"),
 });
 

@@ -51,11 +51,19 @@ export const appRouter = router({
       return { filename, base64: pdf.toString("base64") };
     }),
     reorder: protectedProcedure.input(z.object({ ids: z.array(z.number()) })).mutation(({ ctx, input }) => updateWorkoutOrder(ctx.user.id, input.ids)),
-    session: protectedProcedure.input(z.object({ id: z.number(), action: z.enum(["completed", "skipped"]) })).mutation(async ({ ctx, input }) => {
-      const workout = await getWorkoutForUser(ctx.user.id, input.id);
-      if (!workout) throw new Error("Workout não encontrado");
-      return recordSession(ctx.user.id, input.id, input.action, JSON.stringify(workout));
-    }),
+    session: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        action: z.enum(["completed", "skipped"]),
+        // Teto de 24h: um cronômetro esquecido aberto não pode virar um
+        // registro absurdo no histórico.
+        durationSeconds: z.number().int().min(0).max(86_400).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const workout = await getWorkoutForUser(ctx.user.id, input.id);
+        if (!workout) throw new Error("Workout não encontrado");
+        return recordSession(ctx.user.id, input.id, input.action, JSON.stringify(workout), input.durationSeconds);
+      }),
     generate: protectedProcedure
       .input(z.object({
         // Só nomes do catálogo: aceitar texto livre aqui deixaria o usuário

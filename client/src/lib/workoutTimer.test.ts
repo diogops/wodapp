@@ -1,11 +1,44 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAndroidTimerIntent,
+  findNextExercise,
   formatTimerDisplay,
   getTimerClickAction,
+  getTimerMode,
   isAndroid,
   parseDurationToSeconds,
 } from "./workoutTimer";
+
+describe("getTimerMode", () => {
+  it("counts down when there is a prescribed time and up when there is not", () => {
+    // Exercicio por quantidade tambem tem timer: la ele e marcador de tempo.
+    expect(getTimerMode(720)).toBe("countdown");
+    expect(getTimerMode(null)).toBe("stopwatch");
+    expect(getTimerMode(0)).toBe("stopwatch");
+  });
+});
+
+describe("findNextExercise", () => {
+  const list = [
+    { id: "a", name: "Burpees", seconds: null },
+    { id: "b", name: "Double Unders", seconds: null },
+    { id: "c", name: "Bike", seconds: 480 },
+  ];
+
+  it("returns the following exercise", () => {
+    expect(findNextExercise(list, "a")?.id).toBe("b");
+  });
+
+  it("skips the ones already done", () => {
+    expect(findNextExercise(list, "a", new Set(["b"]))?.id).toBe("c");
+  });
+
+  it("returns null at the end and for an unknown id", () => {
+    expect(findNextExercise(list, "c")).toBeNull();
+    expect(findNextExercise(list, "a", new Set(["b", "c"]))).toBeNull();
+    expect(findNextExercise(list, "inexistente")).toBeNull();
+  });
+});
 
 describe("parseDurationToSeconds", () => {
   it("reads the duration formats used by the seeded workouts", () => {

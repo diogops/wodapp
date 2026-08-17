@@ -52,8 +52,25 @@ describe("workouts procedures", () => {
     const caller = appRouter.createCaller(ctx);
     await caller.workouts.session({ id: 12, action: "completed" });
     await caller.workouts.session({ id: 12, action: "skipped" });
-    expect(dbMocks.recordSession).toHaveBeenNthCalledWith(1, 7, 12, "completed", JSON.stringify(workout));
-    expect(dbMocks.recordSession).toHaveBeenNthCalledWith(2, 7, 12, "skipped", JSON.stringify(workout));
+    expect(dbMocks.recordSession).toHaveBeenNthCalledWith(1, 7, 12, "completed", JSON.stringify(workout), undefined);
+    expect(dbMocks.recordSession).toHaveBeenNthCalledWith(2, 7, 12, "skipped", JSON.stringify(workout), undefined);
+  });
+
+  it("records the stopwatch duration when the athlete timed the workout", async () => {
+    dbMocks.getWorkoutForUser.mockResolvedValue(workout);
+    dbMocks.recordSession.mockResolvedValue([]);
+
+    await appRouter.createCaller(ctx).workouts.session({ id: 12, action: "completed", durationSeconds: 1830 });
+
+    expect(dbMocks.recordSession).toHaveBeenCalledWith(7, 12, "completed", JSON.stringify(workout), 1830);
+  });
+
+  it("rejects an absurd duration", async () => {
+    dbMocks.getWorkoutForUser.mockResolvedValue(workout);
+    // Cronômetro esquecido aberto não pode virar registro de 40 horas.
+    await expect(
+      appRouter.createCaller(ctx).workouts.session({ id: 12, action: "completed", durationSeconds: 200_000 })
+    ).rejects.toThrow();
   });
 
   it("generates a reviewable workout without persisting it", async () => {

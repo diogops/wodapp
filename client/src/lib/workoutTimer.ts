@@ -4,6 +4,38 @@
 
 export type TimerStatus = "running" | "paused" | "finished";
 
+/**
+ * Contagem regressiva quando o exercício tem tempo prescrito; cronômetro
+ * crescente quando é por quantidade. Todo exercício ganha timer — num treino
+ * por repetições ele serve como marcador de tempo, não como limite.
+ */
+export type TimerMode = "countdown" | "stopwatch";
+
+export function getTimerMode(seconds: number | null): TimerMode {
+  return seconds && seconds > 0 ? "countdown" : "stopwatch";
+}
+
+export type TimerExercise = { id: string; name: string; seconds: number | null };
+
+/**
+ * Próximo exercício da sequência achatada do workout, ignorando os já
+ * concluídos — depois de terminar um, oferecer de novo algo já feito seria
+ * mandar o atleta repetir trabalho.
+ */
+export function findNextExercise(
+  exercises: TimerExercise[],
+  currentId: string,
+  doneIds: Set<string> = new Set()
+): TimerExercise | null {
+  const currentIndex = exercises.findIndex(exercise => exercise.id === currentId);
+  if (currentIndex < 0) return null;
+  for (let index = currentIndex + 1; index < exercises.length; index++) {
+    const candidate = exercises[index];
+    if (!doneIds.has(candidate.id)) return candidate;
+  }
+  return null;
+}
+
 const UNIT_SECONDS: Record<string, number> = {
   h: 3600,
   hr: 3600,

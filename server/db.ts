@@ -146,10 +146,15 @@ export async function createWorkout(data: { userId: number; title: string; focus
   return getWorkoutForUser(data.userId, workoutId);
 }
 
-export async function recordSession(userId: number, workoutId: number, action: "completed" | "skipped", snapshot: string) {
+export async function recordSession(
+  userId: number,
+  workoutId: number,
+  action: "completed" | "skipped",
+  snapshot: string,
+  durationSeconds?: number
+) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
-  await db.insert(workoutSessions).values({ userId, workoutId, action, snapshot });
+  await db.insert(workoutSessions).values({ userId, workoutId, action, snapshot, durationSeconds: durationSeconds ?? null });
   return getSessionHistory(userId);
 }
 

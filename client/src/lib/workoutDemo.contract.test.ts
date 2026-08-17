@@ -67,10 +67,12 @@ describe("workout demo UI contract", () => {
     // Rodapé em linha única: empilhar os botões dobrava a altura no celular.
     expect(source).toMatch(/workout-card-actions[^"]*flex-row/);
     expect(source).not.toMatch(/border-t border-\[#3f463e\][^"]*sm:flex-row/);
-    // Concluir, Pular e Próximo moram no mesmo rodapé — sem linha extra abaixo do card.
-    expect(source).toContain("Sortear e abrir outro workout");
+    // Rodapé enxuto: só Concluir e Pular. O "Próximo" saiu porque o
+    // encadeamento do treino agora acontece dentro do timer.
+    expect(source).not.toContain("Sortear e abrir outro workout");
     const footerIndex = source.indexOf("workout-card-actions");
-    expect(source.indexOf("Sortear e abrir outro workout")).toBeGreaterThan(footerIndex);
+    expect(footerIndex).toBeGreaterThan(-1);
+    expect(source.indexOf("Pular", footerIndex)).toBeGreaterThan(footerIndex);
     // O contador de progresso foi absorvido pela toolbar da sessão.
     expect(source).toContain("workout-session-counter");
     expect(source).toMatch(/workout-session-status" aria-live="polite"/);
