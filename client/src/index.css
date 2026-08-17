@@ -73,6 +73,20 @@ button:active { transform: scale(0.98); }
 .app-safe-top {
   padding-top: calc(2rem + env(safe-area-inset-top));
 }
+
+/* Overlays em tela cheia. Sem isto o topo do modal fica sob a barra de status
+   e o rodapé sob a barra de gestos — o `max()` preserva o respiro visual
+   original quando o inset é 0, fora do standalone. */
+.app-overlay {
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* Tela simples que não é o dashboard nem o treino. */
+.app-screen {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
 
 /* Modo de treino: a página inteira fica ancorada no viewport para evitar

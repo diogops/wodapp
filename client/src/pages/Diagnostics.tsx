@@ -62,7 +62,7 @@ export default function Diagnostics() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#f7f7f2] px-4 py-6 text-[#20231f]">
+    <div className="app-screen min-h-screen bg-[#f7f7f2] px-4 py-6 text-[#20231f]">
       <div className="mx-auto max-w-lg">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#e06b3c]">Diagnóstico</p>
         <h1 className="font-display text-2xl font-semibold">Ambiente do dispositivo</h1>

@@ -69,7 +69,7 @@ export function SectionTitleSelect({
       </Select>
 
       {creating && (
-        <div className="fixed inset-0 z-[90] grid place-items-center bg-[#20231f]/70 p-4">
+        <div className="app-overlay fixed inset-0 z-[90] grid place-items-center bg-[#20231f]/70 p-4">
           <div
             className="w-full max-w-sm rounded-2xl bg-[#f7f7f2] p-4 shadow-2xl"
             role="dialog"

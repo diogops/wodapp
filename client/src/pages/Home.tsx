@@ -1047,7 +1047,7 @@ function Today({
         // tela cheia: com 80% de opacidade o treino continuava legível atrás e
         // o cronômetro parecia só sobreposto, sem virar o foco.
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center"
+          className="app-overlay fixed inset-0 z-[80] flex items-center justify-center"
           role="dialog"
           aria-modal="true"
           aria-label={`Timer de ${timer.label}`}
@@ -1110,7 +1110,7 @@ function Today({
         </div>
       )}
       {expandedExerciseData && getExerciseDemo(expandedExerciseData.name) && (
-        <div className={`${demoState.modalClass} grid place-items-center bg-[#20231f]/70 p-4`} role="presentation" onClick={() => setExpandedExercise(null)}>
+        <div className={`${demoState.modalClass} app-overlay grid place-items-center bg-[#20231f]/70 p-4`} role="presentation" onClick={() => setExpandedExercise(null)}>
           <div className="max-h-[80dvh] w-full max-w-sm overflow-y-auto rounded-3xl bg-[#f7f7f2] p-4 shadow-2xl" role="dialog" aria-modal="true" aria-label={`Demonstração de ${expandedExerciseData.name}`} onClick={(event) => event.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
@@ -1315,7 +1315,7 @@ function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, o
       )}
 
       {renaming && (
-        <div className="fixed inset-0 z-[85] grid place-items-center bg-[#20231f]/70 p-4">
+        <div className="app-overlay fixed inset-0 z-[85] grid place-items-center bg-[#20231f]/70 p-4">
           <div
             className="w-full max-w-sm rounded-2xl bg-[#f7f7f2] p-4 shadow-2xl"
             role="dialog"
@@ -1401,7 +1401,7 @@ function CreateWorkout({ value, setValue, busy, onClose, onCreate, sectionTitleO
   const setSections = (next: any[]) => setValue({ ...value, sections: next });
   const invalid = sections.some((section: any) => !section.title?.trim() || (section.exercises || []).some((exercise: any) => !exercise.name?.trim() || (!exercise.prescription?.trim() && !exercise.sets && !exercise.reps && !exercise.duration && !exercise.load)));
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end bg-[#20231f]/50 p-0 sm:place-items-center sm:p-6">
+    <div className="app-overlay fixed inset-0 z-50 grid place-items-end bg-[#20231f]/50 p-0 sm:place-items-center sm:p-6">
       {/* Sem teto de altura o formulário simplesmente saía da tela: com seções e
           exercícios ele fica muito mais alto que o viewport do celular. */}
       <Card className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-b-none border-0 bg-[#f7f7f2] sm:rounded-2xl">

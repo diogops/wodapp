@@ -30,7 +30,7 @@ export function DraftWodPanel({
   const workout = draft.workout ?? {};
 
   return (
-    <div className="fixed inset-0 z-[75] grid place-items-center bg-[#20231f]/70 p-4">
+    <div className="app-overlay fixed inset-0 z-[75] grid place-items-center bg-[#20231f]/70 p-4">
       <div
         className="flex max-h-[88dvh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-[#f7f7f2] shadow-2xl"
         role="dialog"
