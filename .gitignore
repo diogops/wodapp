@@ -124,3 +124,9 @@ client/public/__manus__/version.json
 e2e/.results/
 playwright-report/
 test-results/
+
+# Credenciais baixadas do Google Cloud Console. O repositório é público e o
+# runbook de deploy usa `git add -A` — sem esta regra, um download parado em
+# doc/ entra no próximo commit sem ninguém notar.
+client_secret*.json
+**/client_secret*.json
