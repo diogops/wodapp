@@ -13,6 +13,10 @@ export const users = pgTable("users", {
   // Categoria do atleta. Define o filtro padrão do dashboard e a categoria
   // herdada por workouts que ele cria.
   category: varchar("category", { length: 32 }),
+  // Preferências do motor de abertura. Defaults iguais aos da spec.
+  autoStartEnabled: boolean("autoStartEnabled").notNull().default(true),
+  scheduleLeadMinutes: integer("scheduleLeadMinutes").notNull().default(60),
+  scheduleGraceMinutes: integer("scheduleGraceMinutes").notNull().default(45),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -36,6 +40,24 @@ export const modalities = pgTable("modalities", {
   orderIndex: integer("orderIndex").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+/**
+ * Regra de agenda de uma modalidade. Múltiplas por modalidade são o caso comum
+ * (CrossFit seg/qua/sex 6h30 **e** sábado 9h), então isto é tabela, não coluna.
+ */
+export const scheduleRules = pgTable("scheduleRules", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  modalityId: integer("modalityId").notNull(),
+  /** Dias da semana, 0=domingo. Guardado como CSV: lista curta e sempre lida inteira. */
+  weekdays: varchar("weekdays", { length: 32 }).notNull(),
+  /** "06:30" local. Nulo = regra só de dia, sem hora. */
+  startTime: varchar("startTime", { length: 5 }),
+  durationMinutes: integer("durationMinutes").notNull().default(60),
+  preferredWorkoutId: integer("preferredWorkoutId"),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export const workouts = pgTable("workouts", {
@@ -134,3 +156,4 @@ export type WorkoutSession = typeof workoutSessions.$inferSelect;
 export type WorkoutDraft = typeof workoutDrafts.$inferSelect;
 export type Modality = typeof modalities.$inferSelect;
 export type WorkoutSetLog = typeof workoutSetLogs.$inferSelect;
+export type ScheduleRule = typeof scheduleRules.$inferSelect;

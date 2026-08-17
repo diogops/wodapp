@@ -42,6 +42,7 @@ const workouts = [
   {
     id: 1,
     userId: 1,
+    modalityId: 1,
     title: "Workout A - Double Under + Engine",
     focus: "Técnica de corda, coordenação e condicionamento",
     level: "intermediário",
@@ -91,6 +92,7 @@ const workouts = [
   {
     id: 2,
     userId: 1,
+    modalityId: 1,
     title: "Workout C - Engine / Base Aeróbica",
     focus: "Construir motor sem transformar tudo em WOD",
     level: "base",
@@ -116,12 +118,35 @@ const workouts = [
   },
 ];
 
+const modalities = [
+  {
+    id: 1,
+    userId: 1,
+    slug: "crossfit",
+    name: "CrossFit",
+    color: "#e06b3c",
+    icon: "Dumbbell",
+    grammar: "{}",
+    builtIn: true,
+    archived: false,
+    orderIndex: 0,
+    createdAt: "2026-08-01T10:00:00.000Z",
+    updatedAt: "2026-08-01T10:00:00.000Z",
+  },
+];
+
 const RESPONSES: Record<string, unknown> = {
   "auth.me": user,
   "workouts.list": workouts,
   "workouts.history": [],
   "workouts.draft": null,
+  "workouts.modalities": modalities,
   "workouts.sectionTitles": ["Técnica - 12 min", "WOD - AMRAP 15", "Finisher - Bike 8 min"],
+  "workouts.stats": { weekly: [], byModality: [], loadProgression: [] },
+  // Agenda vazia com sinais zerados: é o estado de quem só faz CrossFit, que é
+  // o padrão do app — e é nele que a tela de treino precisa continuar certa.
+  "schedule.list": [],
+  "schedule.signals": { lastPerformedAt: {}, recentUseByModality: {}, lastUsedModalityId: null },
 };
 
 export async function stubApi(page: Page) {

@@ -2,7 +2,7 @@ import path from "node:path";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { InsertUser, modalities, users, workoutDrafts, workoutSetLogs, workouts, workoutExercises, workoutSections, workoutSessions } from "../drizzle/schema";
+import { InsertUser, modalities, scheduleRules, users, workoutDrafts, workoutSetLogs, workouts, workoutExercises, workoutSections, workoutSessions } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { BUILT_IN_MODALITIES, DEFAULT_MODALITY_SLUG, inferBlockKind } from '@shared/modalities';
 
@@ -292,6 +292,40 @@ export async function getSessionHistory(userId: number) {
   return db.select({ session: workoutSessions, workout: workouts }).from(workoutSessions).leftJoin(workouts, eq(workoutSessions.workoutId, workouts.id)).where(eq(workoutSessions.userId, userId)).orderBy(desc(workoutSessions.performedAt));
 }
 
+/**
+ * Linhas cruas para as estatísticas do histórico. A agregação fica em
+ * `shared/historyStats.ts` — ela depende de interpretar carga em texto livre,
+ * o que é regra de aplicação e não de banco.
+ */
+export async function getHistoryStatsRows(userId: number) {
+  const db = await getDb();
+  const [sessions, setLogs] = await Promise.all([
+    db
+      .select({
+        workoutId: workoutSessions.workoutId,
+        modalityId: workouts.modalityId,
+        performedAt: workoutSessions.performedAt,
+        action: workoutSessions.action,
+        durationSeconds: workoutSessions.durationSeconds,
+      })
+      .from(workoutSessions)
+      .leftJoin(workouts, eq(workoutSessions.workoutId, workouts.id))
+      .where(eq(workoutSessions.userId, userId)),
+    db
+      .select({
+        exerciseName: workoutSetLogs.exerciseName,
+        load: workoutSetLogs.load,
+        reps: workoutSetLogs.reps,
+        completedAt: workoutSetLogs.completedAt,
+        modalityId: workouts.modalityId,
+      })
+      .from(workoutSetLogs)
+      .leftJoin(workouts, eq(workoutSetLogs.workoutId, workouts.id))
+      .where(eq(workoutSetLogs.userId, userId)),
+  ]);
+  return { sessions, setLogs };
+}
+
 export async function updateWorkoutOrder(userId: number, orderedIds: number[]) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -352,6 +386,120 @@ export async function renameWorkout(userId: number, workoutId: number, title: st
     .set({ title })
     .where(and(eq(workouts.id, workoutId), eq(workouts.userId, userId)));
   return getWorkoutForUser(userId, workoutId);
+}
+
+/**
+ * Agenda semanal. `weekdays` vive como CSV no banco e vira `number[]` aqui — a
+ * fronteira de conversão fica neste único ponto para que nem o router nem a
+ * tela precisem conhecer o formato de armazenamento.
+ */
+function toRule(row: typeof scheduleRules.$inferSelect) {
+  return {
+    ...row,
+    weekdays: row.weekdays
+      .split(",")
+      .map(day => Number(day.trim()))
+      .filter(day => Number.isInteger(day) && day >= 0 && day <= 6),
+  };
+}
+
+export async function getScheduleRules(userId: number) {
+  const db = await getDb();
+  const rows = await db
+    .select()
+    .from(scheduleRules)
+    .where(eq(scheduleRules.userId, userId))
+    .orderBy(asc(scheduleRules.startTime), asc(scheduleRules.id));
+  return rows.map(toRule);
+}
+
+export async function saveScheduleRule(data: {
+  id?: number;
+  userId: number;
+  modalityId: number;
+  weekdays: number[];
+  startTime: string | null;
+  durationMinutes: number;
+  preferredWorkoutId: number | null;
+  enabled: boolean;
+}) {
+  const db = await getDb();
+  const values = {
+    userId: data.userId,
+    modalityId: data.modalityId,
+    weekdays: [...new Set(data.weekdays)].sort((a, b) => a - b).join(","),
+    startTime: data.startTime,
+    durationMinutes: data.durationMinutes,
+    preferredWorkoutId: data.preferredWorkoutId,
+    enabled: data.enabled,
+  };
+
+  if (data.id) {
+    // O `userId` no WHERE é o que impede editar a regra de outra conta por id.
+    await db
+      .update(scheduleRules)
+      .set(values)
+      .where(and(eq(scheduleRules.id, data.id), eq(scheduleRules.userId, data.userId)));
+  } else {
+    await db.insert(scheduleRules).values(values);
+  }
+  return getScheduleRules(data.userId);
+}
+
+export async function deleteScheduleRule(userId: number, ruleId: number) {
+  const db = await getDb();
+  await db.delete(scheduleRules).where(and(eq(scheduleRules.id, ruleId), eq(scheduleRules.userId, userId)));
+  return getScheduleRules(userId);
+}
+
+export async function setOpeningPrefs(
+  userId: number,
+  prefs: { autoStartEnabled?: boolean; scheduleLeadMinutes?: number; scheduleGraceMinutes?: number }
+) {
+  const db = await getDb();
+  const patch = Object.fromEntries(Object.entries(prefs).filter(([, value]) => value !== undefined));
+  if (Object.keys(patch).length) await db.update(users).set(patch).where(eq(users.id, userId));
+  const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return rows[0];
+}
+
+/**
+ * Última execução de cada workout e uso recente por modalidade — os dois sinais
+ * que o motor de abertura usa para rodar treinos e ordenar o seletor. Uma volta
+ * ao banco só, porque isto roda na abertura do app.
+ */
+export async function getOpeningSignals(userId: number, sinceDays = 30) {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      workoutId: workoutSessions.workoutId,
+      performedAt: workoutSessions.performedAt,
+      modalityId: workouts.modalityId,
+    })
+    .from(workoutSessions)
+    .leftJoin(workouts, eq(workoutSessions.workoutId, workouts.id))
+    .where(and(eq(workoutSessions.userId, userId), eq(workoutSessions.action, "completed")));
+
+  const cutoff = Date.now() - sinceDays * 86_400_000;
+  const lastPerformedAt: Record<number, string> = {};
+  const recentUseByModality: Record<number, number> = {};
+
+  for (const row of rows) {
+    const performed = row.performedAt?.getTime() ?? 0;
+    const current = lastPerformedAt[row.workoutId];
+    if (!current || new Date(current).getTime() < performed) {
+      lastPerformedAt[row.workoutId] = new Date(performed).toISOString();
+    }
+    if (row.modalityId && performed >= cutoff) {
+      recentUseByModality[row.modalityId] = (recentUseByModality[row.modalityId] ?? 0) + 1;
+    }
+  }
+
+  const lastModality = rows
+    .filter(row => row.modalityId)
+    .sort((a, b) => (b.performedAt?.getTime() ?? 0) - (a.performedAt?.getTime() ?? 0))[0];
+
+  return { lastPerformedAt, recentUseByModality, lastUsedModalityId: lastModality?.modalityId ?? null };
 }
 
 export async function deleteWorkout(userId: number, workoutId: number) {

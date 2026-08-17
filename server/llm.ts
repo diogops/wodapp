@@ -8,6 +8,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Mistral } from "@mistralai/mistralai";
 import { ENV } from "./_core/env";
 import { ocrPdfToMarkdown } from "./ocr";
+import { buildGeneratorSystemPrompt, type GeneratorModality } from "@shared/generatorPrompt";
 
 const exerciseProperties = {
   name: { type: "string" },
@@ -53,23 +54,9 @@ const WORKOUT_JSON_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-const GENERATOR_SYSTEM_PROMPT = [
-  "Você é um treinador de CrossFit montando um workout para um atleta intermediário treinando sozinho.",
-  "Monte uma sessão coerente e executável, com aquecimento/técnica quando fizer sentido, parte principal e finisher quando couber.",
-  "Prescreva volume, tempo e carga concretos — nada de 'a critério'. Use kg para carga e escreva tudo em português.",
-  "Respeite os pedidos do atleta: se ele listou exercícios, use-os como espinha dorsal; se listou o que quer trabalhar, o estímulo tem que refletir isso.",
-  "Você pode acrescentar movimentos complementares para a sessão fazer sentido, mas não troque o foco pedido por outro.",
-  // O app renderiza cada exercício como uma linha própria em tela de celular.
-  // Um bloco descrito em parágrafo vira uma parede de texto ilegível no treino.
-  "FORMATO — isto define se o treino fica legível no celular:",
-  "Cada movimento é um item separado em `exercises`, com `name` contendo só o nome do movimento (ex.: 'Back Squat', 'Burpee').",
-  "Nunca junte vários movimentos num único exercise, e nunca descreva um bloco inteiro em texto corrido.",
-  "`prescription` é curta, no máximo cerca de 60 caracteres (ex.: '5x3 a 75%', '20s forte / 40s leve').",
-  "Prefira preencher `sets`, `reps`, `duration` e `load` separadamente sempre que o dado existir; deixe vazio o que não se aplica.",
-  "`notes` do exercício e da seção são para orientação técnica curta, não para descrever o treino.",
-  "`notes` do workout tem no máximo duas frases.",
-  "Use `format` da seção para o tipo de bloco (AMRAP 15, EMOM 20, 4 rounds, For Time...).",
-].join(" ");
+// O prompt do gerador é derivado da gramática da modalidade — ver
+// `shared/generatorPrompt.ts`. Sem modalidade, CrossFit, que é o padrão do app.
+const GENERATOR_SYSTEM_PROMPT = buildGeneratorSystemPrompt();
 
 const SYSTEM_PROMPT = [
   "Você é um treinador e parser de workouts.",
@@ -156,6 +143,8 @@ export type GenerateWorkoutInput = {
   avoidTitles?: string[];
   previousWorkout?: unknown;
   changeRequest?: string;
+  /** Modalidade alvo. Ausente = CrossFit, o padrão do app. */
+  modality?: GeneratorModality;
 };
 
 /**
@@ -164,6 +153,7 @@ export type GenerateWorkoutInput = {
  */
 export async function generateWorkout(input: GenerateWorkoutInput): Promise<unknown> {
   const brief: string[] = [];
+  const system = input.modality ? buildGeneratorSystemPrompt(input.modality) : GENERATOR_SYSTEM_PROMPT;
 
   // Revisão: parte do workout anterior e muda só o que foi pedido. Sem o JSON
   // anterior no contexto, "troca os exercícios de ombro" viraria um workout
@@ -179,7 +169,7 @@ export async function generateWorkout(input: GenerateWorkoutInput): Promise<unkn
       brief.push(`Ele já tem estes workouts na fila: ${input.avoidTitles.join("; ")}.`);
     }
     brief.push("Devolva o workout completo no schema solicitado.");
-    return requestWorkout(brief.join("\n"));
+    return requestWorkout(brief.join("\n"), system);
   }
 
   // Wishlist em texto livre: o atleta escreve o que quer fazer e o modelo monta
@@ -210,7 +200,7 @@ export async function generateWorkout(input: GenerateWorkoutInput): Promise<unkn
     );
   }
   brief.push("Monte o workout no schema solicitado.");
-  return requestWorkout(brief.join("\n"));
+  return requestWorkout(brief.join("\n"), system);
 }
 
 /**

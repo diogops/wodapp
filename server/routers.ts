@@ -2,10 +2,11 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { isWorkoutCategory } from "@shared/categories";
 import { isBlockKind } from "@shared/modalities";
+import { buildLoadProgression, buildWeeklyVolume, summarizeByModality } from "@shared/historyStats";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createWorkout, deleteDraft, deleteWorkout, ensureDefaultWorkouts, getDraft, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, ensureModalities, backfillSectionKinds, getLastLoads, getModalities, logSet, recordSession, renameWorkout, saveDraft, setUserCategory, updateWorkoutOrder } from "./db";
+import { createWorkout, deleteDraft, deleteScheduleRule, deleteWorkout, ensureDefaultWorkouts, getDraft, getHistoryStatsRows, getOpeningSignals, getScheduleRules, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, ensureModalities, backfillSectionKinds, getLastLoads, getModalities, logSet, recordSession, renameWorkout, saveDraft, saveScheduleRule, setOpeningPrefs, setUserCategory, updateWorkoutOrder } from "./db";
 import { storagePut } from "./storage";
 import { isCatalogExercise, isFocusArea } from "@shared/exerciseCatalog";
 import { extractWorkoutFromPdf, generateWorkout } from "./llm";
@@ -22,6 +23,49 @@ export const appRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => { const cookieOptions = getSessionCookieOptions(ctx.req); ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 }); return { success: true } as const; }),
   }),
+  schedule: router({
+    list: protectedProcedure.query(({ ctx }) => getScheduleRules(ctx.user.id)),
+    signals: protectedProcedure.query(({ ctx }) => getOpeningSignals(ctx.user.id)),
+    save: protectedProcedure
+      .input(z.object({
+        id: z.number().int().positive().optional(),
+        modalityId: z.number().int().positive(),
+        weekdays: z.array(z.number().int().min(0).max(6)).min(1),
+        // Formato validado aqui e não só no banco: um "25:99" gravado viraria
+        // regra sem horário no motor de abertura, silenciosamente.
+        startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullish(),
+        durationMinutes: z.number().int().min(5).max(300).default(60),
+        preferredWorkoutId: z.number().int().positive().nullish(),
+        enabled: z.boolean().default(true),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // A modalidade tem que ser do próprio usuário: o id vem do cliente.
+        const owned = await getModalities(ctx.user.id);
+        if (!owned.some(modality => modality.id === input.modalityId)) {
+          throw new Error("Modalidade não encontrada");
+        }
+        if (input.preferredWorkoutId) {
+          const workout = await getWorkoutForUser(ctx.user.id, input.preferredWorkoutId);
+          if (!workout) throw new Error("Workout preferido não encontrado");
+        }
+        return saveScheduleRule({
+          ...input,
+          userId: ctx.user.id,
+          startTime: input.startTime ?? null,
+          preferredWorkoutId: input.preferredWorkoutId ?? null,
+        });
+      }),
+    remove: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(({ ctx, input }) => deleteScheduleRule(ctx.user.id, input.id)),
+    setPrefs: protectedProcedure
+      .input(z.object({
+        autoStartEnabled: z.boolean().optional(),
+        scheduleLeadMinutes: z.number().int().min(0).max(240).optional(),
+        scheduleGraceMinutes: z.number().int().min(0).max(240).optional(),
+      }))
+      .mutation(({ ctx, input }) => setOpeningPrefs(ctx.user.id, input)),
+  }),
   workouts: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       // Migração oportunista: garante modalidades e deriva os kinds antes de
@@ -32,6 +76,19 @@ export const appRouter = router({
     }),
     modalities: protectedProcedure.query(({ ctx }) => getModalities(ctx.user.id)),
     history: protectedProcedure.query(({ ctx }) => getSessionHistory(ctx.user.id)),
+    stats: protectedProcedure
+      .input(z.object({ weeks: z.number().int().min(2).max(52).default(8) }).default({ weeks: 8 }))
+      .query(async ({ ctx, input }) => {
+        const { sessions, setLogs } = await getHistoryStatsRows(ctx.user.id);
+        // `now` vem do servidor: a agregação é por semana e o cliente já
+        // recebe as chaves prontas, então não há discordância de fuso na tela.
+        const now = new Date();
+        return {
+          weekly: buildWeeklyVolume(sessions, now, input.weeks),
+          byModality: summarizeByModality(sessions),
+          loadProgression: buildLoadProgression(setLogs).slice(0, 12),
+        };
+      }),
     sectionTitles: protectedProcedure.query(({ ctx }) => getSectionTitles(ctx.user.id)),
     lastLoads: protectedProcedure
       .input(z.object({ exerciseNames: z.array(z.string()).max(120) }))
@@ -104,14 +161,21 @@ export const appRouter = router({
         // Texto livre: o app é de um usuário só, então dirigir o próprio prompt
         // é uso legítimo. O limite existe só para não estourar o contexto.
         wishlist: z.string().max(1500).optional(),
+        modalityId: z.number().int().positive().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const existing = await getWorkoutsForUser(ctx.user.id);
+        // A gramática da modalidade é que define o estilo do treino gerado.
+        // Sem modalidade escolhida o gerador cai no CrossFit, que é o padrão.
+        const modality = input.modalityId
+          ? (await getModalities(ctx.user.id)).find(row => row.id === input.modalityId)
+          : undefined;
         const generated = await generateWorkout({
           exercises: input.exercises,
           focusAreas: input.focusAreas,
           notes: input.notes,
           wishlist: input.wishlist,
+          modality: modality ? { name: modality.name, grammar: JSON.parse(modality.grammar) } : undefined,
           avoidTitles: existing.map(workout => workout.title).slice(0, 12),
         });
         // Persistido como rascunho: fechar a aba não pode descartar a proposta.
@@ -124,6 +188,9 @@ export const appRouter = router({
           console.error("[generate] payload rejeitado pelo Zod:", JSON.stringify(generated).slice(0, 600));
           throw new Error("A IA montou um treino fora do formato esperado. Tente de novo.");
         }
+        // A modalidade viaja junto no rascunho: aceitar depois não pode perder
+        // para qual modalidade o treino foi gerado.
+        if (modality) workout.modalityId = modality.id;
         await saveDraft(ctx.user.id, workout);
         return { workout };
       }),
@@ -134,14 +201,21 @@ export const appRouter = router({
         const draft = await getDraft(ctx.user.id);
         if (!draft) throw new Error("Nenhum workout proposto para ajustar");
         const existing = await getWorkoutsForUser(ctx.user.id);
+        // Ajustar não pode trocar de modalidade: o rascunho já nasceu numa.
+        const modalityId = (draft.workout as { modalityId?: number })?.modalityId;
+        const modality = modalityId
+          ? (await getModalities(ctx.user.id)).find(row => row.id === modalityId)
+          : undefined;
         const revised = await generateWorkout({
           exercises: [],
           focusAreas: [],
           previousWorkout: draft.workout,
           changeRequest: input.changeRequest,
+          modality: modality ? { name: modality.name, grammar: JSON.parse(modality.grammar) } : undefined,
           avoidTitles: existing.map(workout => workout.title).slice(0, 12),
         });
         const workout = workoutSchema.parse(revised);
+        if (modality) workout.modalityId = modality.id;
         await saveDraft(ctx.user.id, workout);
         return { workout };
       }),

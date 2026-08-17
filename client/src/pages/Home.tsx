@@ -10,9 +10,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SurpriseWodDialog } from "@/components/SurpriseWodDialog";
 import { DraftWodPanel } from "@/components/DraftWodPanel";
+import { ScheduleDialog } from "@/components/ScheduleDialog";
 import { SectionTitleSelect } from "@/components/SectionTitleSelect";
 import { SetTracker } from "@/components/SetTracker";
 import { parseSetPlan } from "@/lib/straightSets";
+import { clearWorkoutStart, findOpenWorkout, markWorkoutStarted, readWorkoutStart } from "@/lib/openingSession";
+import { describeReason, resolveOpening, type Resolution } from "@shared/resolveOpening";
 import {
   Select,
   SelectContent,
@@ -43,6 +46,7 @@ const BLOCK_KIND_LABELS: Record<BlockKind, string> = {
 import { trpc } from "@/lib/trpc";
 import {
   Bell,
+  CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -234,6 +238,7 @@ export default function Home() {
   const [showCreate, setShowCreate] = useState(false);
   const [showSurprise, setShowSurprise] = useState(false);
   const [showDraft, setShowDraft] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
   const [editingWorkout, setEditingWorkout] = useState<any>(null);
   const [pendingImport, setPendingImport] = useState<any>(null);
   const [newWorkout, setNewWorkout] = useState({
@@ -253,6 +258,8 @@ export default function Home() {
     enabled: Boolean(user),
   });
   const modalitiesQuery = trpc.workouts.modalities.useQuery(undefined, { enabled: Boolean(user) });
+  // Só na aba de histórico: são duas varreduras de tabela e ninguém as vê no treino.
+  const statsQuery = trpc.workouts.stats.useQuery({ weeks: 8 }, { enabled: Boolean(user) && tab === "history" });
   const modalities = modalitiesQuery.data ?? [];
   // Modalidade escolhida fica no cliente: é filtro de visualização, não um dado
   // do treino. Vazio = todas, que é o comportamento de quem só usa CrossFit.
@@ -305,15 +312,98 @@ export default function Home() {
   );
   const nextPendingIndex = useMemo(() => workouts.findIndex(workout => !completedIds.has(workout.id)), [workouts, completedIds]);
   const pickRandomIndex = (exclude = -1) => chooseRandomWorkoutIndex(workouts, completedIds, exclude);
+
+  // --- Motor de abertura -------------------------------------------------
+  // `openedAt` é congelado no primeiro render: a decisão é sobre o momento em
+  // que o app foi aberto, e recalculá-la a cada tick trocaria o treino embaixo
+  // de quem está treinando.
+  const [openedAt] = useState(() => new Date());
+  const [opening, setOpening] = useState<Resolution | null>(null);
+  const [pendingWorkoutId, setPendingWorkoutId] = useState<number | null>(null);
+  const [openingDismissed, setOpeningDismissed] = useState(false);
+  const rulesQuery = trpc.schedule.list.useQuery(undefined, { enabled: Boolean(user) });
+  const signalsQuery = trpc.schedule.signals.useQuery(undefined, { enabled: Boolean(user) });
+
+  const goToWorkout = (workoutId: number, modalityId: number | null) => {
+    if (modalityId !== null && modalityFilter !== null && modalityFilter !== modalityId) changeModality(modalityId);
+    setPendingWorkoutId(workoutId);
+    setTab("today");
+  };
+
   useEffect(() => {
-    if (workouts.length && selectedIndex < 0) setSelectedIndex(pickRandomIndex());
-  }, [workouts.length, history.length]);
+    if (opening || !user) return;
+    if (workoutsQuery.isLoading || modalitiesQuery.isLoading || rulesQuery.isLoading || signalsQuery.isLoading) return;
+
+    const signals = signalsQuery.data ?? { lastPerformedAt: {}, recentUseByModality: {}, lastUsedModalityId: null };
+    const open = findOpenWorkout(allWorkouts.map(workout => workout.id));
+    const openWorkout = open ? allWorkouts.find(workout => workout.id === open.workoutId) : undefined;
+
+    const resolution = resolveOpening(
+      openedAt,
+      {
+        modalities,
+        workouts: allWorkouts.map(workout => ({
+          id: workout.id,
+          modalityId: workout.modalityId,
+          title: workout.title,
+          lastPerformedAt: signals.lastPerformedAt[workout.id] ?? null,
+        })),
+        rules: rulesQuery.data ?? [],
+        activeSession: open && openWorkout
+          ? { id: open.workoutId, workoutId: open.workoutId, modalityId: openWorkout.modalityId, startedAt: new Date(open.startedAt), status: "in_progress" }
+          : null,
+        recentUseByModality: signals.recentUseByModality,
+        lastUsedModalityId: signals.lastUsedModalityId,
+      },
+      {
+        autoStartEnabled: user.autoStartEnabled ?? true,
+        scheduleLeadMinutes: user.scheduleLeadMinutes ?? 60,
+        scheduleGraceMinutes: user.scheduleGraceMinutes ?? 45,
+        // 6h: passou disso, o treino não está "em andamento", foi esquecido.
+        resumeWindowHours: 6,
+        defaultModalityId: modalityFilter,
+      }
+    );
+    setOpening(resolution);
+
+    if (resolution.kind === "resume" && openWorkout) {
+      goToWorkout(openWorkout.id, openWorkout.modalityId);
+      toast.info(describeReason("session_in_progress", "", openedAt));
+    } else if (resolution.kind === "auto" && resolution.workout) {
+      goToWorkout(resolution.workout.id, resolution.modality.id);
+      // Só avisa quando a agenda decidiu: "é sua única modalidade" seria ruído
+      // diário para quem só faz CrossFit.
+      if (resolution.reason !== "single_modality") {
+        toast.info(describeReason(resolution.reason, resolution.modality.name, openedAt));
+      }
+    }
+  }, [opening, user, workoutsQuery.isLoading, modalitiesQuery.isLoading, rulesQuery.isLoading, signalsQuery.isLoading]);
+
+  // O motor decide por id; a lista visível é filtrada, então a seleção espera o
+  // workout aparecer nela em vez de apostar num índice.
+  useEffect(() => {
+    if (pendingWorkoutId === null) return;
+    const index = workouts.findIndex(workout => workout.id === pendingWorkoutId);
+    if (index >= 0) {
+      setSelectedIndex(index);
+      setPendingWorkoutId(null);
+    }
+  }, [pendingWorkoutId, workouts]);
+
+  useEffect(() => {
+    // Sorteio só depois que o motor falou: escolher antes faria a tela piscar
+    // um treino e trocar por outro.
+    if (workouts.length && selectedIndex < 0 && pendingWorkoutId === null && opening) {
+      setSelectedIndex(pickRandomIndex());
+    }
+  }, [workouts.length, history.length, opening, pendingWorkoutId]);
   const currentIndex = selectedIndex >= 0 && workouts[selectedIndex] && !completedIds.has(workouts[selectedIndex].id) ? selectedIndex : (selectedIndex >= 0 && nextPendingIndex >= 0 ? nextPendingIndex : -1);
   const current = currentIndex >= 0 ? workouts[currentIndex] : undefined;
   const refresh = () => {
     void utils.workouts.list.invalidate();
     void utils.workouts.history.invalidate();
     void utils.workouts.sectionTitles.invalidate();
+    void utils.workouts.stats.invalidate();
   };
   const session = trpc.workouts.session.useMutation({
     onSuccess: (_history, variables) => {
@@ -481,6 +571,18 @@ export default function Home() {
                 <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#e06b3c]" />
               </Button>
             )}
+            {/* Agenda só aparece com mais de uma modalidade: com uma só, o app
+                sempre abre nela e a agenda não muda nada. */}
+            {modalities.length > 1 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Agenda de treinos"
+                onClick={() => setShowSchedule(true)}
+              >
+                <CalendarDays className="h-4 w-4" />
+              </Button>
+            )}
             {modalities.length > 1 && (
               <Select
                 value={modalityFilter === null ? "all" : String(modalityFilter)}
@@ -608,7 +710,9 @@ export default function Home() {
             exportingId={exportPdf.isPending ? exportPdf.variables?.id : undefined}
           />
         )}
-        {tab === "history" && <History items={history} />}
+        {tab === "history" && (
+          <History items={history} stats={statsQuery.data} modalities={modalities} />
+        )}
         {draft && showDraft && (
           <DraftWodPanel
             draft={draft}
@@ -619,11 +723,70 @@ export default function Home() {
             onRevise={(changeRequest: string) => reviseDraft.mutate({ changeRequest })}
           />
         )}
+        {/* Seletor de abertura: só aparece quando a agenda realmente não sabe
+            decidir. Fora disso o app abre direto no treino, que é o pedido
+            original — nada de perguntar todo dia. */}
+        {opening?.kind === "picker" && !openingDismissed &&
+          (opening.reason === "ambiguous_time" || opening.reason === "multiple_today" || opening.reason === "user_locked") && (
+          <div className="app-overlay fixed inset-0 z-[70] grid place-items-center bg-[#20231f]/70 p-4">
+            <div
+              className="w-full max-w-sm rounded-3xl bg-[#f7f7f2] p-4 shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Escolha o treino de hoje"
+            >
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#e06b3c]">Hoje</p>
+              <h3 className="font-display text-xl font-semibold">
+                {describeReason(opening.reason, "", openedAt)}
+              </h3>
+              <div className="mt-3 space-y-2">
+                {opening.candidates.map(candidate => (
+                  <button
+                    key={candidate.modality.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#dedfd6] bg-white p-3 text-left"
+                    onClick={() => {
+                      setOpeningDismissed(true);
+                      changeModality(candidate.modality.id);
+                      if (candidate.workout) goToWorkout(candidate.workout.id, candidate.modality.id);
+                    }}
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">{candidate.modality.name}</span>
+                      <span className="block truncate text-xs text-[#6d746a]">
+                        {candidate.workout?.title ?? "Sem treino cadastrado"}
+                        {candidate.rule?.startTime ? ` · ${candidate.rule.startTime}` : ""}
+                      </span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[#6d746a]" />
+                  </button>
+                ))}
+              </div>
+              <Button variant="ghost" className="mt-2 w-full" onClick={() => setOpeningDismissed(true)}>
+                Decidir depois
+              </Button>
+            </div>
+          </div>
+        )}
+        {showSchedule && (
+          <ScheduleDialog
+            modalities={modalities}
+            workouts={allWorkouts}
+            prefs={{
+              autoStartEnabled: user.autoStartEnabled ?? true,
+              scheduleLeadMinutes: user.scheduleLeadMinutes ?? 60,
+              scheduleGraceMinutes: user.scheduleGraceMinutes ?? 45,
+            }}
+            onClose={() => setShowSchedule(false)}
+          />
+        )}
         {showSurprise && (
           <SurpriseWodDialog
             busy={generate.isPending}
             onClose={() => setShowSurprise(false)}
-            onGenerate={selection => generate.mutate(selection)}
+            // A modalidade em foco vai junto: gerar com "Musculação" na tela e
+            // receber um AMRAP seria o comportamento antigo.
+            onGenerate={selection => generate.mutate({ ...selection, modalityId: modalityFilter ?? undefined })}
           />
         )}
         {(showCreate || editingWorkout || pendingImport) && (
@@ -837,9 +1000,11 @@ function Today({
     return () => window.clearInterval(id);
   }, [wodStartedAt]);
 
-  // Trocar de workout zera a contagem: o tempo pertence à sessão daquele WOD.
+  // O tempo pertence à sessão daquele WOD: trocar de workout troca a contagem.
+  // Se aquele treino já tinha sido iniciado e não foi encerrado, a contagem
+  // volta de onde estava — é o que faz reabrir o app no meio não perder o tempo.
   useEffect(() => {
-    setWodStartedAt(null);
+    setWodStartedAt(current ? readWorkoutStart(current.id) : null);
     setWodElapsed(null);
     setTimer(null);
   }, [current?.id]);
@@ -868,7 +1033,12 @@ function Today({
   const startTimer = (exercise: TimerExercise) => {
     const mode = getTimerMode(exercise.seconds);
     const seconds = exercise.seconds ?? 0;
-    setWodStartedAt(prev => prev ?? Date.now());
+    setWodStartedAt(prev => {
+      if (prev !== null) return prev;
+      const now = Date.now();
+      if (current) markWorkoutStarted(current.id, now);
+      return now;
+    });
     const open = () =>
       setTimer({
         exerciseId: exercise.id,
@@ -1126,7 +1296,7 @@ function Today({
             <Button
               className="flex-1 bg-[#e06b3c] text-white hover:bg-[#c8562c]"
               disabled={completedIds.has(current.id)}
-              onClick={() => onSession("completed", wodElapsed ?? undefined)}
+              onClick={() => { clearWorkoutStart(current.id); onSession("completed", wodElapsed ?? undefined); }}
             >
               <Check className="mr-2 h-4 w-4" />
               <span className="sm:hidden">
@@ -1141,7 +1311,7 @@ function Today({
             <Button
               variant="outline"
               className="shrink-0 border-[#4c554b] bg-transparent text-[#f7f7f2] hover:bg-white/10"
-              onClick={() => onSession("skipped", wodElapsed ?? undefined)}
+              onClick={() => { clearWorkoutStart(current.id); onSession("skipped", wodElapsed ?? undefined); }}
             >
               <SkipForward className="mr-2 h-4 w-4" />
               Pular
@@ -1467,7 +1637,80 @@ function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, o
   );
 }
 
-function History({ items }: any) {
+/**
+ * Painel de evolução. Fica acima da lista de sessões porque responde à
+ * pergunta que se faz ao abrir o histórico ("estou treinando quanto, e as
+ * cargas estão subindo?"), que a lista cronológica não responde.
+ */
+function HistoryStats({ stats, modalities }: any) {
+  if (!stats) return null;
+  const modalityName = (id: number) =>
+    id === 0 ? "Sem modalidade" : modalities.find((modality: any) => modality.id === id)?.name ?? "Modalidade";
+  const peak = Math.max(1, ...stats.weekly.map((week: any) => week.total));
+  const hasVolume = stats.weekly.some((week: any) => week.total > 0);
+
+  if (!hasVolume && stats.loadProgression.length === 0) return null;
+
+  return (
+    <div className="mb-4 grid gap-3 md:grid-cols-2">
+      {hasVolume && (
+        <Card className="border-[#dedfd6] bg-white">
+          <CardContent className="p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6d746a]">Volume semanal</p>
+            {/* Barras em altura relativa ao pico: sem eixo, porque a leitura
+                útil aqui é a forma da série, não o número exato. */}
+            <div className="mt-3 flex h-20 items-end gap-1.5">
+              {stats.weekly.map((week: any) => (
+                <div key={week.weekStart} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                  <div
+                    className={`w-full rounded-t ${week.total ? "bg-[#e06b3c]" : "bg-[#e9eae2]"}`}
+                    style={{ height: `${Math.max(4, (week.total / peak) * 100)}%` }}
+                    title={`${week.weekStart}: ${week.total} sessão(ões)`}
+                  />
+                  <span className="text-[9px] tabular-nums text-[#6d746a]">{week.weekStart.slice(5)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 space-y-1">
+              {stats.byModality.map((summary: any) => (
+                <div key={summary.modalityId} className="flex items-baseline justify-between gap-2 text-xs">
+                  <span className="truncate text-[#20231f]">{modalityName(summary.modalityId)}</span>
+                  <span className="shrink-0 tabular-nums text-[#6d746a]">
+                    {summary.sessions} sessões
+                    {summary.totalSeconds > 0 ? ` · ${Math.round(summary.totalSeconds / 60)}min` : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {stats.loadProgression.length > 0 && (
+        <Card className="border-[#dedfd6] bg-white">
+          <CardContent className="p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6d746a]">Evolução de carga</p>
+            <div className="mt-3 space-y-1.5">
+              {stats.loadProgression.map((item: any) => (
+                <div key={item.exerciseName} className="flex items-baseline justify-between gap-2 text-xs">
+                  <span className="truncate">{item.exerciseName}</span>
+                  <span className="shrink-0 tabular-nums">
+                    <span className="text-[#6d746a]">{item.firstKg} → {item.lastKg} kg </span>
+                    <span className={item.deltaKg > 0 ? "font-semibold text-[#47704b]" : "text-[#6d746a]"}>
+                      {item.deltaKg > 0 ? `+${item.deltaKg}` : item.deltaKg}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function History({ items, stats, modalities = [] }: any) {
   const [openId, setOpenId] = useState<number | null>(null);
   if (!items.length)
     return (
@@ -1476,7 +1719,9 @@ function History({ items }: any) {
       </Card>
     );
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <>
+      <HistoryStats stats={stats} modalities={modalities} />
+      <div className="grid gap-3 md:grid-cols-2">
       {items.map((item: any) => (
         <Card key={item.session.id} className="border-[#dedfd6] bg-white">
           <CardContent className="p-4">
@@ -1502,7 +1747,8 @@ function History({ items }: any) {
           </CardContent>
         </Card>
       ))}
-    </div>
+      </div>
+    </>
   );
 }
 
