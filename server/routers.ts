@@ -101,7 +101,15 @@ export const appRouter = router({
           avoidTitles: existing.map(workout => workout.title).slice(0, 12),
         });
         // Persistido como rascunho: fechar a aba não pode descartar a proposta.
-        const workout = workoutSchema.parse(generated);
+        let workout;
+        try {
+          workout = workoutSchema.parse(generated);
+        } catch (error) {
+          // Schema-válido para o provedor mas inválido para o app: registrar o
+          // payload é a única forma de saber qual campo veio errado.
+          console.error("[generate] payload rejeitado pelo Zod:", JSON.stringify(generated).slice(0, 600));
+          throw new Error("A IA montou um treino fora do formato esperado. Tente de novo.");
+        }
         await saveDraft(ctx.user.id, workout);
         return { workout };
       }),

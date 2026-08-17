@@ -225,18 +225,26 @@ async function requestWorkout(prompt: string, system = GENERATOR_SYSTEM_PROMPT):
 }
 
 async function requestWorkoutFromMistral(prompt: string, system: string): Promise<unknown> {
-  const response = await getMistralClient().chat.complete({
-    model: ENV.mistralChatModel,
-    maxTokens: 8000,
-    responseFormat: {
-      type: "json_schema",
-      jsonSchema: { name: "workout", schemaDefinition: WORKOUT_JSON_SCHEMA, strict: true },
-    },
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: prompt },
-    ],
-  });
+  let response;
+  try {
+    response = await getMistralClient().chat.complete({
+      model: ENV.mistralChatModel,
+      maxTokens: 8000,
+      responseFormat: {
+        type: "json_schema",
+        jsonSchema: { name: "workout", schemaDefinition: WORKOUT_JSON_SCHEMA, strict: true },
+      },
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: prompt },
+      ],
+    });
+  } catch (error) {
+    // Sem isto a falha chegava ao usuário como "deu erro" e não deixava rastro
+    // nenhum no servidor, o que tornava impossível diagnosticar depois.
+    console.error("[LLM] Mistral falhou:", ENV.mistralChatModel, String(error));
+    throw new Error("A IA não respondeu. Tente de novo em alguns segundos.");
+  }
 
   const choice = response.choices?.[0];
   if (choice?.finishReason === "length") throw new Error("O workout gerado ficou longo demais");
@@ -247,7 +255,12 @@ async function requestWorkoutFromMistral(prompt: string, system: string): Promis
     : (content ?? []).map(chunk => (chunk.type === "text" ? chunk.text : "")).join("");
 
   if (!text.trim()) throw new Error("O modelo não retornou um workout");
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("[LLM] Mistral devolveu JSON inválido:", text.slice(0, 400));
+    throw new Error("A IA devolveu uma resposta inválida. Tente de novo.");
+  }
 }
 
 async function requestWorkoutFromAnthropic(prompt: string, system: string): Promise<unknown> {
