@@ -52,6 +52,16 @@ const trpcClient = trpc.createClient({
   ],
 });
 
+// Registrado só em produção: em dev o service worker serviria bundle velho e
+// o HMR do Vite passaria a mentir sobre o estado do código.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(error => {
+      console.warn("[PWA] Falha ao registrar o service worker", error);
+    });
+  });
+}
+
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
     <QueryClientProvider client={queryClient}>

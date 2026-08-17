@@ -11,6 +11,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { SurpriseWodDialog } from "@/components/SurpriseWodDialog";
 import { DraftWodPanel } from "@/components/DraftWodPanel";
 import { SectionTitleSelect } from "@/components/SectionTitleSelect";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { WORKOUT_CATEGORIES } from "@shared/categories";
 import { trpc } from "@/lib/trpc";
 import {
   Bell,
@@ -211,6 +219,7 @@ export default function Home() {
     title: "",
     focus: "",
     level: "",
+    category: "",
     suggestedDate: "",
     notes: "",
   });
@@ -222,7 +231,20 @@ export default function Home() {
   const historyQuery = trpc.workouts.history.useQuery(undefined, {
     enabled: Boolean(user),
   });
-  const workouts = workoutsQuery.data ?? [];
+  const allWorkouts = workoutsQuery.data ?? [];
+  // Filtro por categoria do atleta. Workout sem categoria continua visível:
+  // os treinos que existiam antes da categorização não podem sumir da fila.
+  const categoryMatches = useMemo(
+    () =>
+      user?.category
+        ? allWorkouts.filter(workout => !workout.category || workout.category === user.category)
+        : allWorkouts,
+    [allWorkouts, user?.category]
+  );
+  // Se o filtro não sobrar nada, mostra tudo e avisa — ficar sem treino é pior
+  // que ver um de outra categoria, mas o usuário precisa saber que isso ocorreu.
+  const categoryFallback = Boolean(user?.category) && categoryMatches.length === 0 && allWorkouts.length > 0;
+  const workouts = categoryFallback ? allWorkouts : categoryMatches;
   const history = historyQuery.data ?? [];
   const completedIds = useMemo(
     () =>
@@ -258,7 +280,7 @@ export default function Home() {
       refresh();
       setShowCreate(false);
       setPendingImport(null);
-      setNewWorkout({ title: "", focus: "", level: "", suggestedDate: "", notes: "" });
+      setNewWorkout({ title: "", focus: "", level: "", category: "", suggestedDate: "", notes: "" });
       toast.success("Workout adicionado");
     },
   });
@@ -269,6 +291,13 @@ export default function Home() {
     },
   });
   const reorder = trpc.workouts.reorder.useMutation({ onSuccess: refresh });
+  const setCategory = trpc.workouts.setCategory.useMutation({
+    onSuccess: () => {
+      void utils.auth.me.invalidate();
+      toast.success("Categoria atualizada");
+    },
+    onError: error => toast.error(error.message),
+  });
   // UPDATE de verdade no servidor: renomear preserva o id e, com ele, o
   // histórico de sessões — ao contrário de `update`, que apaga e recria.
   const rename = trpc.workouts.rename.useMutation({
@@ -404,9 +433,24 @@ export default function Home() {
                 <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#e06b3c]" />
               </Button>
             )}
-            <span className="hidden text-sm text-[#6d746a] sm:block">
-              {user.name || "Atleta"}
-            </span>
+            <Select
+              value={user.category ?? undefined}
+              onValueChange={value => setCategory.mutate({ category: value })}
+            >
+              <SelectTrigger
+                className="h-8 w-[9.5rem] border-[#dedfd6] bg-white text-xs"
+                aria-label="Sua categoria"
+              >
+                <SelectValue placeholder="Sua categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                {WORKOUT_CATEGORIES.map(category => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               aria-label="Sair"
               variant="ghost"
@@ -457,6 +501,11 @@ export default function Home() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
+        {categoryFallback && (
+          <p className="workout-dashboard-chrome mb-3 rounded-xl bg-[#f4e4dd] px-3 py-2 text-xs leading-5 text-[#8a4a2f]">
+            Nenhum workout na categoria {user.category}. Mostrando todos para você não ficar sem treino.
+          </p>
+        )}
         {tab === "today" && (
             <Today
             workouts={workouts}
@@ -477,7 +526,7 @@ export default function Home() {
             workouts={workouts}
             completedIds={completedIds}
             onMove={move}
-            onEdit={(workout: any) => setEditingWorkout({ id: workout.id, title: workout.title, focus: workout.focus || "", level: workout.level || "", suggestedDate: workout.suggestedDate ? new Date(workout.suggestedDate).toISOString().slice(0, 10) : "", notes: workout.notes || "", sections: workout.sections || [] })}
+            onEdit={(workout: any) => setEditingWorkout({ id: workout.id, title: workout.title, focus: workout.focus || "", level: workout.level || "", category: workout.category || "", suggestedDate: workout.suggestedDate ? new Date(workout.suggestedDate).toISOString().slice(0, 10) : "", notes: workout.notes || "", sections: workout.sections || [] })}
             onDelete={(id: number) => {
               if (confirm("Excluir este workout?")) remove.mutate({ id });
             }}
@@ -515,7 +564,7 @@ export default function Home() {
             busy={create.isPending || update.isPending}
             sectionTitleOptions={sectionTitlesQuery.data ?? []}
             onClose={() => { setShowCreate(false); setEditingWorkout(null); setPendingImport(null); }}
-            onCreate={() => editingWorkout ? update.mutate({ id: editingWorkout.id, data: { title: editingWorkout.title, focus: editingWorkout.focus, level: editingWorkout.level, suggestedDate: editingWorkout.suggestedDate ? new Date(editingWorkout.suggestedDate) : undefined, notes: editingWorkout.notes, sections: editingWorkout.sections || [] } }) : create.mutate({ ...(pendingImport || newWorkout), suggestedDate: (pendingImport || newWorkout).suggestedDate ? new Date((pendingImport || newWorkout).suggestedDate) : undefined, sections: (pendingImport || newWorkout).sections || [], sourceFileKey: pendingImport?.sourceFileKey, sourceFileName: pendingImport?.sourceFileName })}
+            onCreate={() => editingWorkout ? update.mutate({ id: editingWorkout.id, data: { title: editingWorkout.title, focus: editingWorkout.focus, level: editingWorkout.level, category: editingWorkout.category || undefined, suggestedDate: editingWorkout.suggestedDate ? new Date(editingWorkout.suggestedDate) : undefined, notes: editingWorkout.notes, sections: editingWorkout.sections || [] } }) : create.mutate({ ...(pendingImport || newWorkout), category: (pendingImport || newWorkout).category || undefined, suggestedDate: (pendingImport || newWorkout).suggestedDate ? new Date((pendingImport || newWorkout).suggestedDate) : undefined, sections: (pendingImport || newWorkout).sections || [], sourceFileKey: pendingImport?.sourceFileKey, sourceFileName: pendingImport?.sourceFileName })}
           />
         )}
       </main>

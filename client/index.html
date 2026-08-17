@@ -6,8 +6,19 @@
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#20231f" />
     <title>Workout Sequencer</title>
+    <meta name="description" content="Sua fila de treinos de CrossFit, para executar no celular." />
+
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#20231f" />
+
+    <!-- iOS ignora o manifest: standalone, barra de status e ícone da tela de
+         início vêm destas metas específicas da Apple. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="WodApp" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" href="/icons/icon-192.png" type="image/png" />
   </head>
 
   <body>

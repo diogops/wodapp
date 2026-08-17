@@ -1,17 +1,19 @@
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
+import { isWorkoutCategory } from "@shared/categories";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createWorkout, deleteDraft, deleteWorkout, ensureDefaultWorkouts, getDraft, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, recordSession, renameWorkout, saveDraft, updateWorkoutOrder } from "./db";
+import { createWorkout, deleteDraft, deleteWorkout, ensureDefaultWorkouts, getDraft, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, recordSession, renameWorkout, saveDraft, setUserCategory, updateWorkoutOrder } from "./db";
 import { storagePut } from "./storage";
 import { isCatalogExercise, isFocusArea } from "@shared/exerciseCatalog";
 import { extractWorkoutFromPdf, generateWorkout } from "./llm";
 import { buildWorkoutPdf } from "./workoutPdf";
 
 const exerciseSchema = z.object({ name: z.string(), prescription: z.string().optional(), sets: z.string().optional(), reps: z.string().optional(), duration: z.string().optional(), load: z.string().optional(), notes: z.string().optional() });
+const categorySchema = z.string().refine(isWorkoutCategory, "categoria inválida");
 const sectionSchema = z.object({ title: z.string(), format: z.string().optional(), notes: z.string().optional(), exercises: z.array(exerciseSchema).default([]) });
-export const workoutSchema = z.object({ title: z.string().min(1), focus: z.string().optional(), level: z.string().optional(), suggestedDate: z.coerce.date().optional(), notes: z.string().optional(), sections: z.array(sectionSchema).default([]), sourceFileKey: z.string().optional(), sourceFileName: z.string().optional() });
+export const workoutSchema = z.object({ title: z.string().min(1), focus: z.string().optional(), level: z.string().optional(), category: categorySchema.optional(), suggestedDate: z.coerce.date().optional(), notes: z.string().optional(), sections: z.array(sectionSchema).default([]), sourceFileKey: z.string().optional(), sourceFileName: z.string().optional() });
 
 export const appRouter = router({
   system: systemRouter,
@@ -24,7 +26,14 @@ export const appRouter = router({
     history: protectedProcedure.query(({ ctx }) => getSessionHistory(ctx.user.id)),
     sectionTitles: protectedProcedure.query(({ ctx }) => getSectionTitles(ctx.user.id)),
     get: protectedProcedure.input(z.object({ id: z.number() })).query(({ ctx, input }) => getWorkoutForUser(ctx.user.id, input.id)),
-    create: protectedProcedure.input(workoutSchema).mutation(({ ctx, input }) => createWorkout({ ...input, userId: ctx.user.id, orderIndex: 9999 })),
+    create: protectedProcedure.input(workoutSchema).mutation(({ ctx, input }) =>
+      // Sem categoria explícita, o workout nasce na categoria do atleta — é o
+      // que faz ele aparecer no dashboard dele por padrão.
+      createWorkout({ ...input, category: input.category ?? ctx.user.category ?? undefined, userId: ctx.user.id, orderIndex: 9999 })
+    ),
+    setCategory: protectedProcedure
+      .input(z.object({ category: categorySchema }))
+      .mutation(({ ctx, input }) => setUserCategory(ctx.user.id, input.category)),
     update: protectedProcedure.input(z.object({ id: z.number(), data: workoutSchema })).mutation(async ({ ctx, input }) => {
       const existing = await getWorkoutForUser(ctx.user.id, input.id);
       if (!existing) throw new Error("Workout não encontrado");
@@ -114,7 +123,7 @@ export const appRouter = router({
         if (!draft) throw new Error("Nenhum workout proposto para salvar");
         const data = workoutSchema.parse(draft.workout);
         // Aceito "para treinar" entra no topo da fila; aceito "na grade" vai ao fim.
-        const created = await createWorkout({ ...data, userId: ctx.user.id, orderIndex: input.startNow ? -1 : 9999 });
+        const created = await createWorkout({ ...data, category: data.category ?? ctx.user.category ?? undefined, userId: ctx.user.id, orderIndex: input.startNow ? -1 : 9999 });
         await deleteDraft(ctx.user.id);
         return created;
       }),

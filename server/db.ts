@@ -67,6 +67,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
 }
 
+export async function setUserCategory(userId: number, category: string) {
+  const db = await getDb();
+  await db.update(users).set({ category }).where(eq(users.id, userId));
+  const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return rows[0];
+}
+
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
@@ -130,10 +137,10 @@ export async function ensureDefaultWorkouts(userId: number) {
   return getWorkoutsForUser(userId);
 }
 
-export async function createWorkout(data: { userId: number; title: string; focus?: string; level?: string; suggestedDate?: Date; notes?: string; orderIndex: number; sourceFileKey?: string; sourceFileName?: string; sections: Array<{ title: string; format?: string; notes?: string; exercises: Array<{ name: string; prescription?: string; sets?: string; reps?: string; duration?: string; load?: string; notes?: string }> }> }) {
+export async function createWorkout(data: { userId: number; title: string; focus?: string; level?: string; category?: string; suggestedDate?: Date; notes?: string; orderIndex: number; sourceFileKey?: string; sourceFileName?: string; sections: Array<{ title: string; format?: string; notes?: string; exercises: Array<{ name: string; prescription?: string; sets?: string; reps?: string; duration?: string; load?: string; notes?: string }> }> }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const inserted = await db.insert(workouts).values({ ...data, suggestedDate: data.suggestedDate ?? null, sourceFileKey: data.sourceFileKey ?? null, sourceFileName: data.sourceFileName ?? null }).returning({ id: workouts.id });
+  const inserted = await db.insert(workouts).values({ ...data, suggestedDate: data.suggestedDate ?? null, category: data.category ?? null, sourceFileKey: data.sourceFileKey ?? null, sourceFileName: data.sourceFileName ?? null }).returning({ id: workouts.id });
   const workoutId = inserted[0]?.id;
   if (!workoutId) throw new Error("Workout was not created");
   for (let sectionIndex = 0; sectionIndex < data.sections.length; sectionIndex++) {

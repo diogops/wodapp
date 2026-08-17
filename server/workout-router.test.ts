@@ -25,7 +25,7 @@ vi.mock("./llm", () => llmMocks);
 
 import { appRouter } from "./routers";
 
-const ctx = { user: { id: 7, openId: "test", name: "Test", email: "test@example.com", loginMethod: "test", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as any, res: {} as any } as TrpcContext;
+const ctx = { user: { id: 7, openId: "test", name: "Test", email: "test@example.com", loginMethod: "test", role: "user", category: "Avançado", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as any, res: {} as any } as TrpcContext;
 const workout = { id: 12, userId: 7, title: "Força", orderIndex: 0, sections: [], createdAt: new Date(), updatedAt: new Date() };
 
 describe("workouts procedures", () => {
@@ -149,6 +149,30 @@ describe("workouts procedures", () => {
     expect(llmMocks.generateWorkout).toHaveBeenCalledWith(
       expect.objectContaining({ exercises: ["Thruster"], focusAreas: ["Cardio / motor"] })
     );
+  });
+
+  it("inherits the athlete category when the workout does not declare one", async () => {
+    dbMocks.createWorkout.mockResolvedValue(workout);
+
+    await appRouter.createCaller(ctx).workouts.create({ title: "Sem categoria", sections: [] });
+
+    expect(dbMocks.createWorkout).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 7, category: "Avançado" })
+    );
+  });
+
+  it("keeps an explicit category over the athlete's", async () => {
+    dbMocks.createWorkout.mockResolvedValue(workout);
+
+    await appRouter.createCaller(ctx).workouts.create({ title: "Elite", category: "Elite", sections: [] });
+
+    expect(dbMocks.createWorkout).toHaveBeenCalledWith(expect.objectContaining({ category: "Elite" }));
+  });
+
+  it("rejects a category outside the shared list", async () => {
+    await expect(
+      appRouter.createCaller(ctx).workouts.create({ title: "X", category: "Semi-pro", sections: [] } as any)
+    ).rejects.toThrow();
   });
 
   it("renames in place instead of recreating, so session history keeps its workout", async () => {

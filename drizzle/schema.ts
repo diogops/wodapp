@@ -10,6 +10,9 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: roleEnum("role").default("user").notNull(),
+  // Categoria do atleta. Define o filtro padrão do dashboard e a categoria
+  // herdada por workouts que ele cria.
+  category: varchar("category", { length: 32 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -21,6 +24,7 @@ export const workouts = pgTable("workouts", {
   title: varchar("title", { length: 255 }).notNull(),
   focus: text("focus"),
   level: varchar("level", { length: 64 }),
+  category: varchar("category", { length: 32 }),
   suggestedDate: timestamp("suggestedDate"),
   notes: text("notes"),
   orderIndex: integer("orderIndex").notNull().default(0),
