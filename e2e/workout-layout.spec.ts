@@ -100,7 +100,11 @@ test.describe("lista de workouts", () => {
   test.beforeEach(async ({ page }) => {
     await stubApi(page);
     await page.goto("/");
-    await page.getByRole("tab", { name: "Sequência" }).click();
+    // As abas ficam ocultas na tela de treino (`workout-dashboard-chrome`), e a
+    // saída é o botão da toolbar. Clicar na aba nunca funcionaria daqui.
+    await expect(page.locator(".workout-card-body")).toBeVisible();
+    await page.getByRole("button", { name: /voltar para a sequência/i }).click();
+    await expect(page.locator(".workout-row-title").first()).toBeVisible();
   });
 
   test("o nome do WOD não é truncado", async ({ page }) => {
