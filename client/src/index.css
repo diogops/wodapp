@@ -60,6 +60,19 @@ button, input, textarea { font: inherit; }
 button { transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease, color 160ms ease; }
 button:active { transform: scale(0.98); }
 .font-display { font-family: 'Space Grotesk', sans-serif; }
+
+/* Barra de status do iOS em PWA standalone.
+   O iOS lê `apple-mobile-web-app-status-bar-style` no momento da instalação, e
+   um app já adicionado à tela de início mantém o valor antigo — então a folga
+   não pode depender dessa meta. Fora do standalone o inset é 0, o que torna
+   estas regras inertes no navegador e no desktop. */
+.app-header {
+  padding-top: env(safe-area-inset-top);
+}
+
+.app-safe-top {
+  padding-top: calc(2rem + env(safe-area-inset-top));
+}
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
 
 /* Modo de treino: a página inteira fica ancorada no viewport para evitar

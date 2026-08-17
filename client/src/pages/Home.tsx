@@ -405,7 +405,7 @@ export default function Home() {
 
   return (
     <div className={`${getWorkoutShellClass(tab)} ${tab === "today" ? "workout-mode min-h-screen bg-[#f7f7f2] text-[#20231f]" : "min-h-screen bg-[#f7f7f2] text-[#20231f]"}`} data-workout-mode={tab === "today" ? "locked" : "standard"}>
-      <header className="sticky top-0 z-30 border-b border-[#dedfd6] bg-[#f7f7f2]/90 backdrop-blur-xl">
+      <header className="app-header sticky top-0 z-30 border-b border-[#dedfd6] bg-[#f7f7f2]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2 sm:px-6">
           <button
             type="button"
@@ -626,7 +626,7 @@ export default function Home() {
 
 function Landing() {
   return (
-    <div className="min-h-screen bg-[#20231f] px-6 py-8 text-[#f7f7f2]">
+    <div className="app-safe-top min-h-screen bg-[#20231f] px-6 py-8 text-[#f7f7f2]">
       <div className="mx-auto flex min-h-[90vh] max-w-xl flex-col justify-between">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[#e06b3c]">
