@@ -875,24 +875,27 @@ function Today({
         </Card>
       </section>
       {timer && !timer.hidden && (
+        // Faixa opaca ocupando metade da tela em vez de um véu translúcido de
+        // tela cheia: com 80% de opacidade o treino continuava legível atrás e
+        // o cronômetro parecia só sobreposto, sem virar o foco.
         <div
-          className="fixed inset-0 z-[80] grid place-items-center bg-[#20231f]/80 p-6"
+          className="fixed inset-0 z-[80] flex items-center justify-center"
           role="dialog"
           aria-modal="true"
           aria-label={`Timer de ${timer.label}`}
           onClick={onTimerClick}
         >
-          <div className="text-center text-[#f7f7f2]">
+          <div className="flex h-[50dvh] w-full flex-col items-center justify-center bg-black/95 px-6 text-center text-white shadow-2xl">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#f29a73]">
               {timer.status === "finished" ? "Tempo encerrado" : timer.label}
             </p>
             <p
-              className="font-display text-[22vw] font-semibold leading-none tabular-nums sm:text-[9rem]"
+              className="font-display text-[22vw] font-semibold leading-none tabular-nums text-white sm:text-[9rem]"
               aria-live="polite"
             >
               {formatTimerDisplay(timer.remaining)}
             </p>
-            <p className="mt-4 text-sm text-[#bfc7ba]">
+            <p className="mt-4 text-sm text-white/70">
               {timer.status === "finished" ? "Toque para fechar" : "Toque para pausar e fechar"}
             </p>
           </div>
