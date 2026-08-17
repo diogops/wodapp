@@ -119,3 +119,8 @@ client/public/__manus__/version.json
 
 # Local file storage (Railway volume in production)
 .storage/
+
+# Playwright
+e2e/.results/
+playwright-report/
+test-results/

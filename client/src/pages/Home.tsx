@@ -1260,20 +1260,23 @@ function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, o
         <div className="space-y-2.5">
           {workouts.map((workout: any, index: number) => (
             <Card key={workout.id} className="gap-0 border-[#dedfd6] bg-white py-0">
-              {/* Linha única em qualquer largura: empilhar no celular dobrava a
-                  altura de cada card sem ganhar legibilidade. */}
-              <CardContent className="flex items-center gap-3 px-3.5 py-2.5">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e9eae2] text-sm font-semibold text-[#6d746a]">
-                  {String(index + 1).padStart(2, "0")}
+              {/* Nome em linha inteira, ações numa linha própria abaixo e
+                  centradas. Dividir a largura com seis botões truncava o título
+                  do WOD no celular, sem nenhuma forma de ler o nome completo. */}
+              <CardContent className="flex flex-col gap-1.5 px-3.5 py-2.5">
+                <div className="flex items-start gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e9eae2] text-sm font-semibold text-[#6d746a]">
+                    {String(index + 1).padStart(2, "0")}
+                  </div>
+                  <button className="workout-row-title min-w-0 flex-1 text-left" onClick={() => onSelect(index)}>
+                    <p className="text-base font-semibold leading-snug">{workout.title}</p>
+                    <p className="truncate text-sm leading-snug text-[#6d746a]">
+                      {completedIds.has(workout.id) ? "Concluído · " : ""}
+                      {workout.focus || "Sem foco definido"}
+                    </p>
+                  </button>
                 </div>
-                <button className="min-w-0 flex-1 text-left" onClick={() => onSelect(index)}>
-                  <p className="truncate text-base font-semibold leading-snug">{workout.title}</p>
-                  <p className="truncate text-sm leading-snug text-[#6d746a]">
-                    {completedIds.has(workout.id) ? "Concluído · " : ""}
-                    {workout.focus || "Sem foco definido"}
-                  </p>
-                </button>
-                <div className="flex shrink-0 items-center">
+                <div className="flex items-center justify-center gap-1 border-t border-[#ecece6] pt-1">
                   <IconAction
                     label="Renomear"
                     onClick={() => setRenaming({ id: workout.id, title: workout.title })}
