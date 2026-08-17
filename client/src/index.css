@@ -64,6 +64,9 @@ button:active { transform: scale(0.98); }
 
 /* Modo de treino: a página inteira fica ancorada no viewport para evitar
    que um toque acidental altere a posição durante a execução. */
+/* Altura em cadeia de 100%, não em unidade de viewport. No PWA em standalone
+   do iOS, `svh` resolvia menor que a tela e sobrava uma faixa morta embaixo;
+   `height: 100%` herdado de html/body/#root acerta em todos os contextos. */
 html:has(.workout-mode),
 body:has(.workout-mode) {
   height: 100%;
@@ -71,16 +74,23 @@ body:has(.workout-mode) {
   overscroll-behavior: none;
 }
 
+html:has(.workout-mode) #root {
+  height: 100%;
+}
+
 .workout-mode {
-  height: 100svh;
-  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: manipulation;
 }
 
 .workout-mode-main {
-  height: calc(100svh - 65px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -236,11 +246,11 @@ button:focus-visible,
     display: none;
   }
 
-  /* Folga inferior somada ao safe-area: sem ela o rodapé de ações encostava na
-     barra de gestos do iPhone e podia ser cortado. */
+  /* Folga somada ao safe-area nas duas pontas: embaixo pela barra de gestos,
+     em cima porque no PWA a barra de status pode invadir a área útil. */
   .workout-mode .workout-mode-main {
-    height: 100svh;
-    padding: 0.2rem 0.45rem calc(0.75rem + env(safe-area-inset-bottom));
+    height: auto;
+    padding: calc(0.2rem + env(safe-area-inset-top)) 0.45rem calc(0.75rem + env(safe-area-inset-bottom));
   }
 
   .workout-session-screen { gap: 0.2rem; }

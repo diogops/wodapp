@@ -34,7 +34,15 @@ describe("workout demo UI contract", () => {
     expect(styles).toContain(".workout-mode .workout-card > .border-t");
     expect(styles).toMatch(/\.workout-mode \.workout-card > \.border-t\s*\{[^}]*flex:\s*0 0 auto;/s);
     expect(styles).toMatch(/\.workout-mode \.workout-card > \.border-t button\s*\{[^}]*min-height:\s*2rem;[^}]*height:\s*2rem;/s);
-    expect(styles).toMatch(/@media \(max-width: 639px\)[\s\S]*?\.workout-mode \.workout-mode-main\s*\{[\s\S]*?height:\s*100svh;/);
+    // A altura vem de uma cadeia de 100% a partir de html/body/#root, e não de
+    // unidade de viewport: `svh` resolvia menor que a tela no PWA standalone do
+    // iOS e deixava uma faixa morta abaixo do treino.
+    expect(styles).not.toMatch(/\.workout-mode[^{]*\{[^}]*height:\s*100svh/);
+    expect(styles).toMatch(/html:has\(\.workout-mode\) #root\s*\{[\s\S]*?height:\s*100%;/);
+    expect(styles).toMatch(/\.workout-mode\s*\{[\s\S]*?height:\s*100%;/);
+    // Safe-area nas duas pontas: barra de status em cima, gestos embaixo.
+    expect(styles).toMatch(/env\(safe-area-inset-top\)/);
+    expect(styles).toMatch(/env\(safe-area-inset-bottom\)/);
     expect(styles).toMatch(/@media \(min-width: 640px\)[\s\S]*?\.workout-mode \.workout-mode-main\s*\{[\s\S]*?padding:/);
     expect(styles).toMatch(/\.workout-mode \.workout-card-body\s*\{[\s\S]*?min-height:\s*0;/);
     expect(styles).toContain("overflow-y: auto;");
