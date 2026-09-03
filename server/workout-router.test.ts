@@ -4,6 +4,7 @@ import type { TrpcContext } from "./_core/context";
 const dbMocks = vi.hoisted(() => ({
   createWorkout: vi.fn(),
   ensureDefaultWorkouts: vi.fn(),
+  ensureProgramWorkouts: vi.fn(),
   deleteWorkout: vi.fn(),
   getSessionHistory: vi.fn(),
   getWorkoutForUser: vi.fn(),
@@ -43,6 +44,7 @@ describe("workouts procedures", () => {
 
   it("lists workouts and reorders them for the authenticated user", async () => {
     dbMocks.ensureDefaultWorkouts.mockResolvedValue([workout]);
+    dbMocks.ensureProgramWorkouts.mockResolvedValue([workout]);
     dbMocks.ensureModalities.mockResolvedValue([]);
     dbMocks.backfillSectionKinds.mockResolvedValue(0);
     const caller = appRouter.createCaller(ctx);
@@ -52,6 +54,10 @@ describe("workouts procedures", () => {
     // A migração roda junto da listagem, sem passo manual do usuário.
     expect(dbMocks.ensureModalities).toHaveBeenCalledWith(7);
     expect(dbMocks.backfillSectionKinds).toHaveBeenCalledWith(7);
+    // Programas transcritos de PDF entram depois dos WODs padrão, senão um
+    // usuário novo nunca receberia os de CrossFit.
+    expect(dbMocks.ensureProgramWorkouts).toHaveBeenCalledWith(7);
+    expect(dbMocks.ensureDefaultWorkouts.mock.invocationCallOrder[0]).toBeLessThan(dbMocks.ensureProgramWorkouts.mock.invocationCallOrder[0]);
   });
 
   it("records completed and skipped sessions with a workout snapshot", async () => {

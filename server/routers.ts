@@ -6,13 +6,13 @@ import { buildLoadProgression, buildWeeklyVolume, summarizeByModality } from "@s
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createWorkout, deleteDraft, deleteScheduleRule, deleteWorkout, ensureDefaultWorkouts, getDraft, getHistoryStatsRows, getOpeningSignals, getScheduleRules, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, ensureModalities, backfillSectionKinds, getLastLoads, getModalities, logSet, recordSession, renameWorkout, saveDraft, saveScheduleRule, setOpeningPrefs, setUserCategory, updateWorkoutOrder } from "./db";
+import { createWorkout, deleteDraft, deleteScheduleRule, deleteWorkout, ensureDefaultWorkouts, ensureProgramWorkouts, getDraft, getHistoryStatsRows, getOpeningSignals, getScheduleRules, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, ensureModalities, backfillSectionKinds, getLastLoads, getModalities, logSet, recordSession, renameWorkout, saveDraft, saveScheduleRule, setOpeningPrefs, setUserCategory, updateWorkoutOrder } from "./db";
 import { storagePut } from "./storage";
 import { isCatalogExercise, isFocusArea } from "@shared/exerciseCatalog";
 import { extractWorkoutFromPdf, generateWorkout } from "./llm";
 import { buildWorkoutPdf } from "./workoutPdf";
 
-const exerciseSchema = z.object({ name: z.string(), prescription: z.string().optional(), sets: z.string().optional(), reps: z.string().optional(), duration: z.string().optional(), load: z.string().optional(), notes: z.string().optional() });
+const exerciseSchema = z.object({ name: z.string(), prescription: z.string().optional(), sets: z.string().optional(), reps: z.string().optional(), duration: z.string().optional(), load: z.string().optional(), notes: z.string().optional(), imageUrl: z.string().max(512).optional() });
 const categorySchema = z.string().refine(isWorkoutCategory, "categoria inválida");
 const sectionSchema = z.object({ title: z.string(), format: z.string().optional(), kind: z.string().refine(isBlockKind).nullish(), notes: z.string().optional(), exercises: z.array(exerciseSchema).default([]) });
 export const workoutSchema = z.object({ title: z.string().min(1), modalityId: z.number().int().positive().optional(), focus: z.string().optional(), level: z.string().optional(), category: categorySchema.optional(), suggestedDate: z.coerce.date().optional(), notes: z.string().optional(), sections: z.array(sectionSchema).default([]), sourceFileKey: z.string().optional(), sourceFileName: z.string().optional() });
@@ -72,7 +72,8 @@ export const appRouter = router({
       // devolver a fila. Idempotente, então roda sem custo quando já está feito.
       await ensureModalities(ctx.user.id);
       await backfillSectionKinds(ctx.user.id);
-      return ensureDefaultWorkouts(ctx.user.id);
+      await ensureDefaultWorkouts(ctx.user.id);
+      return ensureProgramWorkouts(ctx.user.id);
     }),
     modalities: protectedProcedure.query(({ ctx }) => getModalities(ctx.user.id)),
     history: protectedProcedure.query(({ ctx }) => getSessionHistory(ctx.user.id)),

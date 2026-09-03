@@ -99,6 +99,9 @@ export const workoutExercises = pgTable("workoutExercises", {
   duration: varchar("duration", { length: 64 }),
   load: varchar("load", { length: 128 }),
   notes: text("notes"),
+  // Ilustração do movimento. Caminho estático servido pelo cliente
+  // (`/demos/...`), não uma chave do storage: é asset do app, não upload.
+  imageUrl: varchar("imageUrl", { length: 512 }),
   orderIndex: integer("orderIndex").notNull().default(0),
 });
 

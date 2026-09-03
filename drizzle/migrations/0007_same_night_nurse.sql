@@ -1,0 +1,1 @@
+ALTER TABLE "workoutExercises" ADD COLUMN "imageUrl" varchar(512);

@@ -219,8 +219,11 @@ function HintButton({
   );
 }
 
-function getExerciseDemo(name: string) {
-  const normalized = name.trim().toLowerCase();
+// A imagem gravada no exercício (`imageUrl`, vinda do programa importado)
+// ganha da busca por nome: o mapa acima é o fallback para os WODs antigos.
+function getExerciseDemo(exercise: { name: string; imageUrl?: string | null }) {
+  if (exercise.imageUrl) return exercise.imageUrl;
+  const normalized = exercise.name.trim().toLowerCase();
   return Object.entries(EXERCISE_DEMOS).find(([key]) => normalized.includes(key))?.[1] || EXERCISE_DEMOS.generic;
 }
 const dateLabel = (value: Date | string | null | undefined) =>
@@ -1386,7 +1389,7 @@ function Today({
           </div>
         </div>
       )}
-      {expandedExerciseData && getExerciseDemo(expandedExerciseData.name) && (
+      {expandedExerciseData && getExerciseDemo(expandedExerciseData) && (
         <div className={`${demoState.modalClass} app-overlay grid place-items-center bg-[#20231f]/70 p-4`} role="presentation" onClick={() => setExpandedExercise(null)}>
           <div className="max-h-[80dvh] w-full max-w-sm overflow-y-auto rounded-3xl bg-[#f7f7f2] p-4 shadow-2xl" role="dialog" aria-modal="true" aria-label={`Demonstração de ${expandedExerciseData.name}`} onClick={(event) => event.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -1397,7 +1400,7 @@ function Today({
               <Button type="button" variant="ghost" size="icon" aria-label="Fechar demonstração" onClick={() => setExpandedExercise(null)}><X className="h-5 w-5" /></Button>
             </div>
             <div className="rounded-2xl bg-[#f1f1eb] p-3">
-              <img src={getExerciseDemo(expandedExerciseData.name)} alt={`Demonstração de ${expandedExerciseData.name}`} className="mx-auto h-56 w-full object-contain" loading="lazy" />
+              <img src={getExerciseDemo(expandedExerciseData)} alt={`Demonstração de ${expandedExerciseData.name}`} className="mx-auto h-56 w-full object-contain" loading="lazy" />
             </div>
             <p className="mt-3 text-sm leading-6 text-[#6d746a]">Use a ilustração como referência visual e priorize controle, amplitude confortável e execução segura.</p>
           </div>

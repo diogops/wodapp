@@ -130,3 +130,8 @@ test-results/
 # doc/ entra no próximo commit sem ninguém notar.
 client_secret*.json
 **/client_secret*.json
+
+# PDF fonte do programa de fortalecimento: 55 MB de ilustrações geradas. As
+# dez imagens úteis já estão em client/public/demos/fortalecimento-*.jpg e a
+# transcrição em server/programs/fortalecimento.ts; o repositório é público.
+doc/treinos_fortalecimento_crossfit.pdf

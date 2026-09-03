@@ -5,6 +5,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { InsertUser, modalities, scheduleRules, users, workoutDrafts, workoutSetLogs, workouts, workoutExercises, workoutSections, workoutSessions } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { BUILT_IN_MODALITIES, DEFAULT_MODALITY_SLUG, inferBlockKind } from '@shared/modalities';
+import { SEED_PROGRAMS } from './programs';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -207,7 +208,42 @@ export async function ensureDefaultWorkouts(userId: number) {
   return getWorkoutsForUser(userId);
 }
 
-export async function createWorkout(data: { userId: number; title: string; focus?: string; level?: string; category?: string; modalityId?: number; suggestedDate?: Date; notes?: string; orderIndex: number; sourceFileKey?: string; sourceFileName?: string; sections: Array<{ title: string; format?: string; kind?: string | null; notes?: string; exercises: Array<{ name: string; prescription?: string; sets?: string; reps?: string; duration?: string; load?: string; notes?: string }> }> }) {
+/**
+ * Semeia os programas transcritos de PDFs (`server/programs/`) — cada um numa
+ * modalidade própria e, quando o programa diz o dia da semana, com uma regra
+ * de agenda só de dia apontando para o treino. Idempotente por
+ * `sourceFileName`: é o campo que já diz "de onde veio", então não precisa de
+ * marcador novo. Roda depois de `ensureDefaultWorkouts`, senão um usuário novo
+ * nunca receberia os WODs de CrossFit (a checagem lá é "nenhum workout").
+ */
+export async function ensureProgramWorkouts(userId: number) {
+  const db = await getDb();
+  const modalitiesBySlug = new Map((await ensureModalities(userId)).map(row => [row.slug, row]));
+  const existing = await getWorkoutsForUser(userId);
+  let nextOrder = existing.reduce((max, workout) => Math.max(max, workout.orderIndex + 1), 0);
+  let seeded = false;
+  for (const program of SEED_PROGRAMS) {
+    const modality = modalitiesBySlug.get(program.modalitySlug);
+    if (!modality) continue;
+    if (existing.some(workout => workout.sourceFileName === program.sourceFileName)) continue;
+    const created: Array<{ id: number; weekday: number | null }> = [];
+    for (const { weekday, ...workout } of program.workouts) {
+      const row = await createWorkout({ ...workout, userId, modalityId: modality.id, orderIndex: nextOrder++, sourceFileName: program.sourceFileName, sections: workout.sections.map(section => ({ ...section, exercises: [...section.exercises] })) });
+      if (row) created.push({ id: row.id, weekday });
+    }
+    // Só cria a agenda se a modalidade ainda não tem nenhuma: uma regra já
+    // editada pelo usuário vale mais do que o dia sugerido pelo programa.
+    const rules = await db.select({ id: scheduleRules.id }).from(scheduleRules).where(and(eq(scheduleRules.userId, userId), eq(scheduleRules.modalityId, modality.id)));
+    if (!rules.length) {
+      const values = created.filter(item => item.weekday !== null).map(item => ({ userId, modalityId: modality.id, weekdays: String(item.weekday), startTime: null, durationMinutes: program.durationMinutes, preferredWorkoutId: item.id, enabled: true }));
+      if (values.length) await db.insert(scheduleRules).values(values);
+    }
+    seeded = true;
+  }
+  return seeded ? getWorkoutsForUser(userId) : existing;
+}
+
+export async function createWorkout(data: { userId: number; title: string; focus?: string; level?: string; category?: string; modalityId?: number; suggestedDate?: Date; notes?: string; orderIndex: number; sourceFileKey?: string; sourceFileName?: string; sections: Array<{ title: string; format?: string; kind?: string | null; notes?: string; exercises: Array<{ name: string; prescription?: string; sets?: string; reps?: string; duration?: string; load?: string; notes?: string; imageUrl?: string }> }> }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const inserted = await db.insert(workouts).values({ ...data, suggestedDate: data.suggestedDate ?? null, category: data.category ?? null, modalityId: data.modalityId ?? null, sourceFileKey: data.sourceFileKey ?? null, sourceFileName: data.sourceFileName ?? null }).returning({ id: workouts.id });
