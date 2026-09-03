@@ -1,0 +1,132 @@
+import { expect, test } from "@playwright/test";
+import { fixtures, stubApi } from "./fixtures";
+
+/**
+ * O cabeçalho global precisa ficar sempre à mostra no treino — é nele que se
+ * troca a modalidade e se abre a agenda. E a janela não pode ficar deslocada:
+ * no iOS, focar a carga de uma série empurra a página para cima e o
+ * cabeçalho some sob a barra de status. Aqui as duas coisas viram invariante.
+ */
+
+const fortalecimento = {
+  id: 2,
+  userId: 1,
+  slug: "fortalecimento",
+  name: "Fortalecimento",
+  color: "#5b7a3f",
+  icon: "Anvil",
+  grammar: "{}",
+  builtIn: true,
+  archived: false,
+  orderIndex: 6,
+  createdAt: "2026-08-01T10:00:00.000Z",
+  updatedAt: "2026-08-01T10:00:00.000Z",
+};
+
+const strengthWorkout = {
+  id: 9,
+  userId: 1,
+  modalityId: 2,
+  title: "Dia 1 — Clean e força de pernas",
+  focus: "Power clean, front squat e transferência para o overhead",
+  level: "intermediário",
+  category: "Intermediário",
+  suggestedDate: null,
+  notes: null,
+  orderIndex: 2,
+  sourceFileKey: null,
+  sourceFileName: "treinos_fortalecimento_crossfit.pdf",
+  createdAt: "2026-08-01T10:00:00.000Z",
+  updatedAt: "2026-08-01T10:00:00.000Z",
+  sections: [
+    {
+      id: 90,
+      workoutId: 9,
+      title: "Força",
+      format: "6 × 3",
+      kind: "straight_sets",
+      notes: null,
+      orderIndex: 0,
+      exercises: [
+        { id: 900, sectionId: 90, name: "Power clean", prescription: "6 × 3 @ 65–75% 1RM; RPE 6–7", sets: "6", reps: "3", duration: null, load: "65–75% 1RM", notes: null, imageUrl: "/demos/fortalecimento-power-clean.jpg", orderIndex: 0 },
+      ],
+    },
+  ],
+};
+
+test.describe("cabeçalho no modo de treino", () => {
+  test.beforeEach(async ({ page }) => {
+    // Duas modalidades e uma regra só de dia para hoje: o motor de abertura cai
+    // em `single_scheduled_today` e abre o treino de força direto, sem picker.
+    const today = new Date().getDay();
+    await stubApi(page, {
+      "workouts.modalities": [
+        { id: 1, userId: 1, slug: "crossfit", name: "CrossFit", color: "#e06b3c", icon: "Dumbbell", grammar: "{}", builtIn: true, archived: false, orderIndex: 0, createdAt: "2026-08-01T10:00:00.000Z", updatedAt: "2026-08-01T10:00:00.000Z" },
+        fortalecimento,
+      ],
+      "workouts.list": [...fixtures.workouts, strengthWorkout],
+      "schedule.list": [
+        { id: 1, userId: 1, modalityId: 2, weekdays: [today], startTime: null, durationMinutes: 60, preferredWorkoutId: 9, enabled: true, createdAt: "2026-08-01T10:00:00.000Z" },
+      ],
+    });
+    await page.goto("/");
+    await expect(page.locator(".workout-card-body")).toBeVisible();
+    await expect(page.getByText("Power clean", { exact: true })).toBeVisible();
+  });
+
+  test("o cabeçalho global fica visível, com o seletor de modalidade ao alcance", async ({ page }) => {
+    const header = page.locator("header.app-header");
+    await expect(header).toBeVisible();
+    const headerBox = (await header.boundingBox())!;
+    expect(headerBox.y, "cabeçalho começa acima do topo").toBeGreaterThanOrEqual(0);
+
+    const modality = page.getByLabel("Modalidade");
+    await expect(modality).toBeVisible();
+    const box = (await modality.boundingBox())!;
+    const viewport = page.viewportSize()!;
+    expect(box.x, "seletor começa fora da tela").toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, "seletor passa da borda direita").toBeLessThanOrEqual(viewport.width);
+
+    // Nada pode transbordar na horizontal: é o sintoma de cabeçalho "apertado".
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+    expect(overflow, "cabeçalho transborda na horizontal").toBe(false);
+
+    // E de fato dá para trocar: a lista abre com a outra modalidade.
+    await modality.click();
+    await expect(page.getByRole("option", { name: "Fortalecimento" })).toBeVisible();
+    await page.keyboard.press("Escape");
+  });
+
+  test("o cabeçalho, o botão voltar e o rodapé cabem juntos na tela", async ({ page }) => {
+    const header = (await page.locator("header.app-header").boundingBox())!;
+    const back = (await page.getByRole("button", { name: /voltar para a sequência/i }).boundingBox())!;
+    expect(back.y, "botão voltar sob o cabeçalho").toBeGreaterThanOrEqual(header.y + header.height - 1);
+
+    const footer = page.locator(".workout-card-actions");
+    await expect(footer).toBeVisible();
+    const footerBox = (await footer.boundingBox())!;
+    expect(footerBox.y + footerBox.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  });
+
+  test("a janela volta ao topo depois de sair do campo de carga", async ({ page }) => {
+    const load = page.getByLabel(/carga de power clean/i);
+    await expect(load).toBeVisible();
+    await expect(load).toHaveAttribute("inputmode", "decimal");
+
+    // Reproduz o que o iOS faz: com o campo focado, a janela é empurrada.
+    // A página precisa poder rolar para o deslocamento existir de fato.
+    await load.focus();
+    await page.evaluate(() => {
+      document.body.style.minHeight = "250vh";
+      window.scrollTo(0, 120);
+    });
+    await expect.poll(() => page.evaluate(() => window.scrollY), { message: "com o campo focado, a janela não deve ser mexida" }).toBe(120);
+
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect.poll(() => page.evaluate(() => window.scrollY), { message: "depois do blur a janela volta a 0" }).toBe(0);
+
+    // E o cabeçalho voltou a ser alcançável.
+    const header = (await page.locator("header.app-header").boundingBox())!;
+    expect(header.y).toBeGreaterThanOrEqual(0);
+  });
+});

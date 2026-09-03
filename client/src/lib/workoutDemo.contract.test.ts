@@ -48,10 +48,13 @@ describe("workout demo UI contract", () => {
     expect(styles).toContain("overflow-y: auto;");
   });
 
-  it("reclaims the mobile viewport: no global app header and no dead card spacing", () => {
+  it("reclaims the mobile viewport: compact global header and no dead card spacing", () => {
     const styles = readSource("client/src/index.css");
-    // A barra global do app é o chrome mais caro no celular; some durante o treino.
-    expect(styles).toMatch(/@media \(max-width: 639px\)[\s\S]*?\.workout-mode header\s*\{[\s\S]*?display:\s*none;/);
+    // O cabeçalho global fica visível no celular: é onde se troca a
+    // modalidade. Só o nome do app some, para caber numa faixa.
+    expect(styles).not.toMatch(/\.workout-mode header\s*\{[\s\S]*?display:\s*none;/);
+    expect(styles).toMatch(/@media \(max-width: 639px\)[\s\S]*?\.workout-mode header h1\s*\{[\s\S]*?display:\s*none;/);
+    expect(styles).toMatch(/\.workout-mode header \[data-slot="select-trigger"\]\s*\{[\s\S]*?min-width:\s*0;/);
     // Sem o header global, o modo de treino ocupa o viewport inteiro.
     expect(styles).not.toContain("calc(100svh - 2.15rem)");
     // O Card do shadcn traz py-6 + gap-6; ambos precisam ser zerados.

@@ -221,11 +221,16 @@ button:focus-visible,
   flex: 1;
   min-height: 0;
   gap: 0;
+  /* Coluna que nunca cresce além do viewport: sem o `minmax(0, …)` a coluna
+     do grid segue o min-content do conteúdo e, em telas de 320px, o card
+     saía uns 70px pela direita — cortando "Iniciar", "Ver" e o "+" da carga. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .workout-mode .workout-today-grid > section {
   display: flex;
   min-height: 0;
+  min-width: 0;
   flex: 1;
   flex-direction: column;
 }
@@ -264,13 +269,38 @@ button:focus-visible,
   }
 }
 
-/* Execução no celular: a barra global do app sai de cena durante o treino e
-   todo o chrome (voltar + progresso) cabe em uma única faixa, deixando o
-   restante do viewport para os exercícios. Sair pela ação "Sequência"
-   devolve o header completo. */
+/* Execução no celular: o cabeçalho global fica sempre à mostra — é nele que
+   se troca a modalidade e se abre a agenda, e sem ele o treino vira um beco
+   sem saída. Mas fica compacto: some o nome do app, os seletores dividem a
+   largura que sobra em vez de ter largura fixa, e nada pode transbordar. */
 @media (max-width: 639px) {
-  .workout-mode header {
+  .workout-mode header > div {
+    gap: 0.5rem;
+    padding-block: 0.3rem;
+  }
+  .workout-mode header h1 {
     display: none;
+  }
+  .workout-mode header > div > div:last-child {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+  .workout-mode header [data-slot="select-trigger"] {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    max-width: 9.5rem;
+    padding-inline: 0.5rem;
+    gap: 0.25rem;
+    font-size: 0.78rem;
+  }
+  /* Nome longo ("Intermediário") termina em reticências em vez de ser cortado. */
+  .workout-mode header [data-slot="select-trigger"] > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* Folga somada ao safe-area nas duas pontas: embaixo pela barra de gestos,

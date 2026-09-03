@@ -133,7 +133,7 @@ Selection order on the "today" tab: the opening engine decides first; only if it
 
 ## Workout mode: the locked-viewport contract
 
-The `today` tab applies a `workout-mode` class that locks global scroll (`html:has(.workout-mode)` in `client/src/index.css`) and pins toolbar → card header → scrollable body → action footer inside one viewport. **Only `.workout-card-body` may scroll**; everything else is `flex: 0 0 auto`. On mobile the global app header is hidden entirely and the progress counter lives in the session toolbar, so the chrome is one bar instead of three.
+The `today` tab applies a `workout-mode` class that locks global scroll (`html:has(.workout-mode)` in `client/src/index.css`) and pins toolbar → card header → scrollable body → action footer inside one viewport. **Only `.workout-card-body` may scroll**; everything else is `flex: 0 0 auto`. On mobile the global app header **stays visible but compact** (app name hidden, selects share the remaining width) because it is the only place to switch modality or open the schedule; the progress counter lives in the session toolbar. `useViewportLock` (`client/src/lib/viewportLock.ts`) resets `window.scrollTo(0,0)` whenever no input is focused: iOS Safari scrolls the locked page to reveal the SetTracker load input and never scrolls it back, which cut the header off.
 
 Two traps in this area:
 - **`CardTitle` renders a `div`, not an `h3`** (`client/src/components/ui/card.tsx`). CSS targeting `.workout-card h3` silently misses the workout title. Target `[data-slot="card-title"]`.
@@ -151,7 +151,7 @@ Vitest, `environment: "node"` — there is no jsdom and no React Testing Library
 2. **Schema tests** (`server/workout-format.test.ts`): parse/reject cases against the exported `workoutSchema`.
 3. **Pure-logic and contract tests** (`client/src/lib/*.test.ts`): plain function assertions, plus the source-grep contract test described above.
 
-4. **Layout tests** (`e2e/workout-layout.spec.ts`, `npx pnpm exec playwright test`): WebKit at iPhone viewports, which is the only way to check the one-screen constraint that keeps regressing. `e2e/fixtures.ts` intercepts `**/api/trpc/**` and answers by procedure name, so the logged-in app renders with no session and no database. **Unknown procedure names return `null`** — when you add a query the app calls on load, add it to `RESPONSES` too, or the test passes through a fallback path instead of the real one.
+4. **Layout tests** (`e2e/workout-layout.spec.ts`, `e2e/workout-header.spec.ts`; `npx pnpm exec playwright test`): WebKit at iPhone viewports, which is the only way to check the one-screen constraint that keeps regressing. `e2e/fixtures.ts` intercepts `**/api/trpc/**` and answers by procedure name, so the logged-in app renders with no session and no database. **Unknown procedure names return `null`** — when you add a query the app calls on load, add it to `RESPONSES` too, or the test passes through a fallback path instead of the real one. `stubApi(page, overrides)` swaps individual responses per spec. Playwright serves **`dist/` via `vite preview`**, so run `pnpm build` first or it tests stale code. On this Windows machine the runner dies with `EPERM rmdir e2e/.results` when the dir exists from a previous run; delete it from PowerShell (`Remove-Item -Recurse -Force e2e\.results`) and run again.
 
 Path aliases `@/*` → `client/src/*` and `@shared/*` → `shared/*` are defined in three places (`tsconfig.json`, `vite.config.ts`, `vitest.config.ts`) and must stay in sync.
 

@@ -76,6 +76,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { chooseRandomWorkoutIndex } from "@/lib/workoutSelection";
 import { getWorkoutDemoState, getWorkoutShellClass } from "@/lib/workoutMode";
+import { useViewportLock } from "@/lib/viewportLock";
 import {
   buildAndroidTimerIntent,
   findNextExercise,
@@ -237,6 +238,9 @@ const dateLabel = (value: Date | string | null | undefined) =>
 export default function Home() {
   const { user, loading, logout } = useAuth();
   const [tab, setTab] = useState<Tab>("today");
+  // No modo de treino a janela não pode ficar deslocada: o iOS a empurra ao
+  // focar a carga do SetTracker e não devolve. Ver viewportLock.ts.
+  useViewportLock(tab === "today");
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [showCreate, setShowCreate] = useState(false);
   const [showSurprise, setShowSurprise] = useState(false);

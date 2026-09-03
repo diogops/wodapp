@@ -97,6 +97,7 @@ export function SetTracker({
             <input
               className="h-9 min-w-0 flex-1 rounded-lg border border-[#dedfd6] bg-white px-2 text-center text-sm tabular-nums"
               placeholder="Carga"
+              inputMode="decimal"
               aria-label={`Carga de ${exerciseName}`}
               value={load}
               onChange={event => setLoad(event.target.value)}

@@ -149,14 +149,15 @@ const RESPONSES: Record<string, unknown> = {
   "schedule.signals": { lastPerformedAt: {}, recentUseByModality: {}, lastUsedModalityId: null },
 };
 
-export async function stubApi(page: Page) {
+export async function stubApi(page: Page, overrides: Record<string, unknown> = {}) {
+  const responses = { ...RESPONSES, ...overrides };
   await page.route("**/api/trpc/**", async route => {
     const url = new URL(route.request().url());
     // httpBatchLink junta procedures separadas por vírgula no caminho, e a
     // resposta precisa ser um array na mesma ordem.
     const names = decodeURIComponent(url.pathname.replace("/api/trpc/", "")).split(",");
     const body = names.map(name => ({
-      result: { data: { json: RESPONSES[name] ?? null } },
+      result: { data: { json: responses[name] ?? null } },
     }));
     await route.fulfill({
       status: 200,
