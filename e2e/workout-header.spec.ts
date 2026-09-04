@@ -178,3 +178,51 @@ test.describe("enquadramento fixo no celular", () => {
     await expect(page.getByLabel("Sair")).toBeVisible();
   });
 });
+
+test.describe("linha de abas da biblioteca", () => {
+  test.beforeEach(async ({ page }) => {
+    await stubApi(page);
+    await page.goto("/");
+    await expect(page.locator(".workout-card-body")).toBeVisible();
+    await page.getByRole("button", { name: /voltar para a sequência/i }).click();
+  });
+
+  test("no celular: sem título, abas só em ícones à esquerda e visualização à direita, numa linha", async ({ page }) => {
+    const width = page.viewportSize()!.width;
+    const mobile = width < 640;
+
+    const intro = page.getByRole("heading", { name: "Treinar é aparecer." });
+    if (mobile) await expect(intro).toBeHidden();
+    else await expect(intro).toBeVisible();
+
+    const tabs = page.getByRole("tab");
+    await expect(tabs).toHaveCount(3);
+    for (const name of ["Hoje", "Sequência", "Histórico"]) {
+      const tab = page.getByRole("tab", { name });
+      await expect(tab).toBeVisible();
+      if (mobile) expect((await tab.innerText()).trim(), `aba ${name} com rótulo no celular`).toBe("");
+    }
+
+    const list = page.getByRole("button", { name: "Ver em lista" });
+    const grid = page.getByRole("button", { name: "Ver em cards" });
+    await expect(list).toBeVisible();
+    await expect(grid).toBeVisible();
+
+    const tabsBox = (await page.getByRole("tablist").boundingBox())!;
+    const gridBox = (await grid.boundingBox())!;
+    // Mesma linha: os centros verticais coincidem dentro da altura da aba.
+    const tabsMid = tabsBox.y + tabsBox.height / 2;
+    const gridMid = gridBox.y + gridBox.height / 2;
+    expect(Math.abs(tabsMid - gridMid), "visualização não está na linha das abas").toBeLessThan(tabsBox.height / 2);
+    if (mobile) {
+      expect(tabsBox.x, "abas não alinhadas à esquerda").toBeLessThan(40);
+      expect(gridBox.x + gridBox.width, "visualização não alinhada à direita").toBeGreaterThan(width - 40);
+    }
+
+    // Trocar a visualização continua funcionando a partir da linha das abas.
+    await grid.click();
+    await expect(page.getByText("Workout A - Double Under + Engine")).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+    expect(overflow).toBe(false);
+  });
+});

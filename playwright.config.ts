@@ -13,6 +13,9 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   reporter: [["list"]],
+  // 10s, não 5s: com os três projetos em paralelo nesta máquina, a espera
+  // inicial pelo card do treino oscilava e derrubava a suíte sem regressão.
+  expect: { timeout: 10_000 },
   outputDir: "./e2e/.results",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:4173",

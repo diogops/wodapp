@@ -56,6 +56,7 @@ import {
   FileUp,
   Github,
   LayoutGrid,
+  ListOrdered,
   History as HistoryIcon,
   Loader2,
   LogOut,
@@ -197,6 +198,15 @@ const dateLabel = (value: Date | string | null | undefined) =>
 export default function Home() {
   const { user, loading, logout } = useAuth();
   const [tab, setTab] = useState<Tab>("today");
+  // Preferência de visualização da Sequência. Vive aqui, e não na Library,
+  // porque o botão que a troca fica na linha das abas.
+  const [libraryView, setLibraryView] = useState<LibraryView>(readLibraryView);
+  const changeLibraryView = (next: LibraryView) => {
+    setLibraryView(next);
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {}
+  };
   // No modo de treino a janela não pode ficar deslocada: o iOS a empurra ao
   // focar a carga do SetTracker e não devolve. Ver viewportLock.ts.
   useViewportLock(tab === "today");
@@ -604,40 +614,54 @@ export default function Home() {
       <main className={tab === "today" ? "workout-mode-main mx-auto flex min-h-0 max-w-6xl flex-col px-4 py-3 sm:px-6 sm:py-10" : "mx-auto max-w-6xl px-4 pb-36 pt-6 sm:px-6 sm:pt-10"}>
         {/* Intro enxuta: na Sequência ela ficava entre o cabeçalho e os cards,
             empurrando a lista para baixo sem acrescentar informação. */}
-        <div className="workout-dashboard-chrome workout-intro mb-4">
+        <div className="workout-dashboard-chrome workout-intro mb-4 hidden sm:block">
           <h2 className="font-display text-2xl font-semibold tracking-[-0.03em]">
             Treinar é aparecer.
           </h2>
         </div>
-        <Tabs
-          value={tab}
-          onKeyDown={event => { if (tab === "today" && (event.key === "PageDown" || event.key === "PageUp")) event.preventDefault(); }}
-          onValueChange={value => setTab(value as Tab)}
-          className="workout-dashboard-chrome mb-6"
-        >
-          <TabsList className="mx-auto flex h-11 w-fit bg-[#e9eae2] p-1">
-            <TabsTrigger
-              value="today"
-              className="gap-2 data-[state=active]:bg-white"
-            >
-              <Sparkles className="h-4 w-4" />
-              Hoje
-            </TabsTrigger>
-            <TabsTrigger
-              value="library"
-              className="gap-2 data-[state=active]:bg-white"
-            >
-              Sequência
-            </TabsTrigger>
-            <TabsTrigger
-              value="history"
-              className="gap-2 data-[state=active]:bg-white"
-            >
-              <HistoryIcon className="h-4 w-4" />
-              Histórico
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Uma linha só no celular: abas em ícones à esquerda e, na Sequência,
+            o modo de visualização à direita. No desktop as abas continuam
+            centradas com rótulo e o modo de visualização encosta à direita. */}
+        <div className="workout-dashboard-chrome mb-4 flex items-center justify-between gap-2 sm:relative sm:mb-6 sm:justify-center">
+          <Tabs
+            value={tab}
+            onKeyDown={event => { if (tab === "today" && (event.key === "PageDown" || event.key === "PageUp")) event.preventDefault(); }}
+            onValueChange={value => setTab(value as Tab)}
+          >
+            <TabsList className="flex h-11 w-fit bg-[#e9eae2] p-1">
+              <TabsTrigger value="today" aria-label="Hoje" className="gap-2 px-3 data-[state=active]:bg-white">
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden sm:inline">Hoje</span>
+              </TabsTrigger>
+              <TabsTrigger value="library" aria-label="Sequência" className="gap-2 px-3 data-[state=active]:bg-white">
+                <ListOrdered className="h-4 w-4" />
+                <span className="hidden sm:inline">Sequência</span>
+              </TabsTrigger>
+              <TabsTrigger value="history" aria-label="Histórico" className="gap-2 px-3 data-[state=active]:bg-white">
+                <HistoryIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Histórico</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {tab === "library" && (
+            <div className="flex items-center gap-1 sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2">
+              <IconAction
+                label="Ver em lista"
+                className={libraryView === "list" ? "bg-[#e9eae2] text-[#20231f]" : ""}
+                onClick={() => changeLibraryView("list")}
+              >
+                <Rows3 className="h-4 w-4" />
+              </IconAction>
+              <IconAction
+                label="Ver em cards"
+                className={libraryView === "grid" ? "bg-[#e9eae2] text-[#20231f]" : ""}
+                onClick={() => changeLibraryView("grid")}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </IconAction>
+            </div>
+          )}
+        </div>
         {categoryFallback && (
           <p className="workout-dashboard-chrome mb-3 rounded-xl bg-[#f4e4dd] px-3 py-2 text-xs leading-5 text-[#8a4a2f]">
             Nenhum workout na categoria {user.category}. Mostrando todos para você não ficar sem treino.
@@ -660,6 +684,7 @@ export default function Home() {
         )}
         {tab === "library" && (
           <Library
+            view={libraryView}
             workouts={workouts}
             completedIds={completedIds}
             onMove={move}
@@ -1384,43 +1409,20 @@ type LibraryView = "list" | "grid";
 
 const VIEW_STORAGE_KEY = "wodapp:library-view";
 
-function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, onExportPdf, onRename, exportingId }: any) {
+// Persistida: trocar de aba ou recarregar não pode devolver o usuário para o
+// modo que ele não escolheu.
+function readLibraryView(): LibraryView {
+  try {
+    return localStorage.getItem(VIEW_STORAGE_KEY) === "grid" ? "grid" : "list";
+  } catch {
+    return "list";
+  }
+}
+
+function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, onExportPdf, onRename, exportingId, view }: any) {
   const [renaming, setRenaming] = useState<{ id: number; title: string } | null>(null);
-  // Preferência de visualização persiste: trocar de aba ou recarregar não pode
-  // devolver o usuário para o modo que ele não escolheu.
-  const [view, setView] = useState<LibraryView>(() => {
-    try {
-      return localStorage.getItem(VIEW_STORAGE_KEY) === "grid" ? "grid" : "list";
-    } catch {
-      return "list";
-    }
-  });
-
-  const changeView = (next: LibraryView) => {
-    setView(next);
-    try {
-      localStorage.setItem(VIEW_STORAGE_KEY, next);
-    } catch {}
-  };
-
   return (
     <div className="space-y-2.5">
-      <div className="flex items-center justify-end gap-1">
-        <IconAction
-          label="Ver em lista"
-          className={view === "list" ? "bg-[#e9eae2] text-[#20231f]" : ""}
-          onClick={() => changeView("list")}
-        >
-          <Rows3 className="h-4 w-4" />
-        </IconAction>
-        <IconAction
-          label="Ver em cards"
-          className={view === "grid" ? "bg-[#e9eae2] text-[#20231f]" : ""}
-          onClick={() => changeView("grid")}
-        >
-          <LayoutGrid className="h-4 w-4" />
-        </IconAction>
-      </div>
 
       {view === "grid" ? (
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
