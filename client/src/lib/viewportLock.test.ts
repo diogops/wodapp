@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isTextEntryElement, shouldResetWindowScroll } from "./viewportLock";
+import { createResetBreaker, isTextEntryElement, RESET_BURST_LIMIT, shouldResetWindowScroll } from "./viewportLock";
 
 const element = (tagName: string, extra: Record<string, unknown> = {}) =>
   ({ tagName, ...extra }) as unknown as Element;
@@ -27,5 +27,23 @@ describe("trava de viewport do modo de treino", () => {
 
   it("não faz nada quando já está no lugar", () => {
     expect(shouldResetWindowScroll({ activeElement: element("BODY"), scrollX: 0, scrollY: 0 })).toBe(false);
+  });
+
+  it("ignora frações de pixel: em pixel ratio 3 o WebKit devolve 0,33 depois do scrollTo(0,0)", () => {
+    // Sem isto: reset → evento de scroll → reset, sem fim, e o worker do
+    // WebKit nunca fechava.
+    expect(shouldResetWindowScroll({ activeElement: element("BODY"), scrollX: 0, scrollY: 0.34 })).toBe(false);
+    expect(shouldResetWindowScroll({ activeElement: element("BODY"), scrollX: 0.5, scrollY: 0 })).toBe(false);
+    expect(shouldResetWindowScroll({ activeElement: element("BODY"), scrollX: 0, scrollY: 1 })).toBe(true);
+  });
+
+  it("corta uma rajada de resets e volta a permitir quando ela cessa", () => {
+    let clock = 1000;
+    const allowed = createResetBreaker(() => clock);
+    for (let i = 0; i < RESET_BURST_LIMIT; i++) expect(allowed(), `reset ${i + 1}`).toBe(true);
+    expect(allowed(), "além do limite na mesma janela").toBe(false);
+    expect(allowed()).toBe(false);
+    clock += 1000;
+    expect(allowed(), "nova janela").toBe(true);
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getWorkoutDemoState,
   getWorkoutShellClass,
+  isWorkoutLocked,
   WORKOUT_DEMO_MODAL_CLASS,
   WORKOUT_MODE_CLASS,
 } from "./workoutMode";
@@ -11,6 +12,13 @@ describe("workout mode shell", () => {
     expect(getWorkoutShellClass("today")).toBe(WORKOUT_MODE_CLASS);
     expect(getWorkoutShellClass("library")).toBe("");
     expect(getWorkoutShellClass("history")).toBe("");
+  });
+
+  it("waits for the page to settle at the top before locking", () => {
+    expect(getWorkoutShellClass("today", false)).toBe("");
+    expect(isWorkoutLocked("today", false)).toBe(false);
+    expect(isWorkoutLocked("today", true)).toBe(true);
+    expect(isWorkoutLocked("library", true)).toBe(false);
   });
 
   it("opens the controlled demonstration layer without changing global scroll state", () => {

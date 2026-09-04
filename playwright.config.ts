@@ -20,6 +20,9 @@ export default defineConfig({
   // primeira espera pelo card (todos os testes de um projeto caem juntos).
   // Uma falha real cai duas vezes e continua aparecendo.
   retries: 1,
+  // Um worker: com vários, os WebKit desta máquina travavam em bloco e os
+  // workers nem conseguiam ser encerrados. Sequencial leva ~1,5 min.
+  workers: 1,
   outputDir: "./e2e/.results",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:4173",

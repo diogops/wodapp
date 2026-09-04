@@ -76,7 +76,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { chooseRandomWorkoutIndex } from "@/lib/workoutSelection";
-import { getWorkoutDemoState, getWorkoutShellClass } from "@/lib/workoutMode";
+import { getWorkoutDemoState, getWorkoutShellClass, isWorkoutLocked } from "@/lib/workoutMode";
 import { useViewportLock } from "@/lib/viewportLock";
 import {
   buildAndroidTimerIntent,
@@ -207,9 +207,25 @@ export default function Home() {
       localStorage.setItem(VIEW_STORAGE_KEY, next);
     } catch {}
   };
+  // A trava do treino só entra depois que a janela assentou em 0,0 numa
+  // página ainda rolável (dois frames). O Safari do iPhone guarda um
+  // deslocamento residual entre telas e, travada, a página não tem como
+  // desfazê-lo — era o cabeçalho cortado ao abrir direto no treino.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (tab !== "today") { setSettled(false); return; }
+    window.scrollTo(0, 0);
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      second = requestAnimationFrame(() => setSettled(true));
+    });
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+  }, [tab]);
+  const locked = isWorkoutLocked(tab, settled);
   // No modo de treino a janela não pode ficar deslocada: o iOS a empurra ao
   // focar a carga do SetTracker e não devolve. Ver viewportLock.ts.
-  useViewportLock(tab === "today");
+  useViewportLock(locked);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [showCreate, setShowCreate] = useState(false);
   const [showSurprise, setShowSurprise] = useState(false);
@@ -518,7 +534,7 @@ export default function Home() {
   };
 
   return (
-    <div className={`${getWorkoutShellClass(tab)} ${tab === "today" ? "workout-mode min-h-screen bg-[#f7f7f2] text-[#20231f]" : "min-h-screen bg-[#f7f7f2] text-[#20231f]"}`} data-workout-mode={tab === "today" ? "locked" : "standard"}>
+    <div className={`${getWorkoutShellClass(tab, settled)} ${locked ? "workout-mode min-h-screen bg-[#f7f7f2] text-[#20231f]" : "min-h-screen bg-[#f7f7f2] text-[#20231f]"}`} data-workout-mode={locked ? "locked" : "standard"}>
       <header className="app-header sticky top-0 z-30 border-b border-[#dedfd6] bg-[#f7f7f2]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2 sm:px-6">
           <button
@@ -611,7 +627,7 @@ export default function Home() {
       </header>
       {/* Folga inferior fora do modo de treino: sem ela o último card fica
           embaixo do rodapé fixo e não há como alcançá-lo. */}
-      <main className={tab === "today" ? "workout-mode-main mx-auto flex min-h-0 max-w-6xl flex-col px-4 py-3 sm:px-6 sm:py-10" : "mx-auto max-w-6xl px-4 pb-36 pt-6 sm:px-6 sm:pt-10"}>
+      <main className={locked ? "workout-mode-main mx-auto flex min-h-0 max-w-6xl flex-col px-4 py-3 sm:px-6 sm:py-10" : "mx-auto max-w-6xl px-4 pb-36 pt-6 sm:px-6 sm:pt-10"}>
         {/* Intro enxuta: na Sequência ela ficava entre o cabeçalho e os cards,
             empurrando a lista para baixo sem acrescentar informação. */}
         <div className="workout-dashboard-chrome workout-intro mb-4 hidden sm:block">

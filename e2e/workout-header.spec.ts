@@ -142,7 +142,8 @@ test.describe("cabeçalho no modo de treino", () => {
     await expect.poll(() => page.evaluate(() => window.scrollY), { message: "com o campo focado, a janela não deve ser mexida" }).toBe(120);
 
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-    await expect.poll(() => page.evaluate(() => window.scrollY), { message: "depois do blur a janela volta a 0" }).toBe(0);
+    await expect.poll(() => page.evaluate(() => window.scrollY), { message: "depois do blur a janela volta a 0" }).toBeLessThan(1);
+    await page.evaluate(() => { document.body.style.minHeight = ""; });
 
     // E o cabeçalho voltou a ser alcançável.
     const header = (await page.locator("header.app-header").boundingBox())!;
@@ -243,5 +244,39 @@ test.describe("linha de abas da biblioteca", () => {
     await expect(page.getByText("Workout A - Double Under + Engine")).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
     expect(overflow).toBe(false);
+  });
+});
+
+test.describe("entrar no treino com a janela deslocada", () => {
+  test("o modo treino nasce ancorado no topo mesmo vindo de uma página rolada", async ({ page }) => {
+    await stubApi(page);
+    await page.goto("/");
+    await expect(page.locator(".workout-card-body")).toBeVisible();
+    await page.getByRole("button", { name: /voltar para a sequência/i }).click();
+    await expect(page.getByRole("tab", { name: "Hoje" })).toBeVisible();
+
+    // O cenário do iPhone: a janela ficou com um deslocamento e o usuário
+    // entra no treino sem "puxar para baixo" antes.
+    await page.evaluate(() => {
+      document.body.style.minHeight = "250vh";
+      window.scrollTo(0, 150);
+    });
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(150);
+
+    await page.getByRole("tab", { name: "Hoje" }).click();
+    await expect(page.locator(".workout-card-body")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => window.scrollY), { message: "janela não voltou a 0 ao travar" }).toBeLessThan(1);
+    // Devolve o documento ao tamanho real antes de medir: o estado "página
+    // rolável com o treino travado" foi só o gatilho do cenário.
+    await page.evaluate(() => { document.body.style.minHeight = ""; });
+
+    // A trava entra dois frames depois do card: espera a classe existir.
+    await expect(page.locator(".workout-mode")).toHaveCount(1);
+    const position = await page.evaluate(() => getComputedStyle(document.querySelector(".workout-mode")!).position);
+    expect(position).toBe("fixed");
+    const header = (await page.locator("header.app-header").boundingBox())!;
+    expect(Math.round(header.y), "cabeçalho fora do topo").toBe(0);
+    const back = (await page.getByRole("button", { name: /voltar para a sequência/i }).boundingBox())!;
+    expect(back.y).toBeGreaterThanOrEqual(header.y + header.height - 1);
   });
 });

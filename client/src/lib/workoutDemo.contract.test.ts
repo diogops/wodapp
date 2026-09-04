@@ -40,6 +40,9 @@ describe("workout demo UI contract", () => {
     expect(styles).not.toMatch(/\.workout-mode[^{]*\{[^}]*height:\s*100svh/);
     expect(styles).toMatch(/html:has\(\.workout-mode\) #root\s*\{[\s\S]*?height:\s*100%;/);
     expect(styles).toMatch(/\.workout-mode\s*\{[\s\S]*?height:\s*100%;/);
+    // Ancorado ao viewport: um deslocamento residual da janela não move o app.
+    expect(styles).toMatch(/\.workout-mode\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?inset:\s*0;/);
+    expect(readSource("client/src/pages/Home.tsx")).toContain("isWorkoutLocked(tab, settled)");
     // Safe-area nas duas pontas: barra de status em cima, gestos embaixo.
     expect(styles).toMatch(/env\(safe-area-inset-top\)/);
     expect(styles).toMatch(/env\(safe-area-inset-bottom\)/);

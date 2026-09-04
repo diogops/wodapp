@@ -128,6 +128,11 @@ html:has(.workout-mode) #root {
 }
 
 .workout-mode {
+  /* Ancorado ao viewport, não ao documento: se o Safari deixar a janela com
+     um deslocamento residual (ele guarda isso entre telas e, travada, a
+     página não consegue desfazer), o app não sai do lugar mesmo assim. */
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
   height: 100%;
