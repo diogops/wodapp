@@ -62,6 +62,22 @@ html { font-family: 'DM Sans', sans-serif; background: #f7f7f2; }
 html { touch-action: pan-y; overflow-x: clip; overscroll-behavior-x: none; }
 body { margin: 0; min-width: 320px; overflow-x: clip; background: #f7f7f2; }
 .overflow-x-auto { touch-action: pan-x pan-y; }
+
+/* Toasts do sonner no celular: a folha dele usa `left: 16px` + `width: 100%`,
+   o que deixa o contêiner (fixo) 16px além da borda direita. No iOS um
+   elemento fixo mais largo que a tela é o bastante para a página deslizar
+   na horizontal — e o aviso da agenda aparece justamente ao abrir direto num
+   treino. Seletor dobrado para vencer a regra dele sem !important. */
+@media (max-width: 600px) {
+  [data-sonner-toaster][data-sonner-toaster] {
+    width: auto;
+    left: var(--mobile-offset-left, 16px);
+    right: var(--mobile-offset-right, 16px);
+  }
+  [data-sonner-toaster][data-sonner-toaster] [data-sonner-toast] {
+    width: 100%;
+  }
+}
 button, input, textarea { font: inherit; }
 button { transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease, color 160ms ease; }
 button:active { transform: scale(0.98); }

@@ -16,6 +16,10 @@ export default defineConfig({
   // 10s, não 5s: com os três projetos em paralelo nesta máquina, a espera
   // inicial pelo card do treino oscilava e derrubava a suíte sem regressão.
   expect: { timeout: 10_000 },
+  // Uma repetição: o WebKit no Windows às vezes trava um worker inteiro na
+  // primeira espera pelo card (todos os testes de um projeto caem juntos).
+  // Uma falha real cai duas vezes e continua aparecendo.
+  retries: 1,
   outputDir: "./e2e/.results",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:4173",

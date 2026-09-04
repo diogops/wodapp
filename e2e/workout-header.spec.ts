@@ -108,6 +108,25 @@ test.describe("cabeçalho no modo de treino", () => {
     expect(footerBox.y + footerBox.height).toBeLessThanOrEqual(page.viewportSize()!.height);
   });
 
+  test("nada passa da borda da tela, nem o aviso da agenda", async ({ page }) => {
+    // O aviso "seu dia de Fortalecimento" é o que aparece ao abrir direto num
+    // treino. O contêiner fixo dele media 16px a mais que a tela, e no iOS
+    // isso basta para a página deslizar na horizontal.
+    await expect(page.getByText(/seu dia de Fortalecimento/)).toBeVisible();
+    const offenders = await page.evaluate(() => {
+      const vw = window.innerWidth;
+      const out: string[] = [];
+      document.querySelectorAll("body *").forEach(el => {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 && (rect.right > vw + 1 || rect.left < -1)) {
+          out.push(`${el.tagName}.${String((el as HTMLElement).className).slice(0, 40)} ${Math.round(rect.left)}..${Math.round(rect.right)}`);
+        }
+      });
+      return out;
+    });
+    expect(offenders, "elementos além da borda da tela").toEqual([]);
+  });
+
   test("a janela volta ao topo depois de sair do campo de carga", async ({ page }) => {
     const load = page.getByLabel(/carga de power clean/i);
     await expect(load).toBeVisible();
