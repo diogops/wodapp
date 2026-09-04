@@ -55,7 +55,13 @@
 
 * { border-color: var(--border); }
 html { font-family: 'DM Sans', sans-serif; background: #f7f7f2; }
-body { margin: 0; min-width: 320px; background: #f7f7f2; }
+/* Enquadramento fixo no celular: só rolagem vertical. `pan-y` desliga pinça e
+   toque duplo (o iOS ignora `maximum-scale`), `overflow-x: clip` impede a
+   página de ficar mais larga que a tela e `overscroll-behavior-x` corta o
+   arrasto lateral elástico. Contêineres que rolam de lado liberam `pan-x`. */
+html { touch-action: pan-y; overflow-x: clip; overscroll-behavior-x: none; }
+body { margin: 0; min-width: 320px; overflow-x: clip; background: #f7f7f2; }
+.overflow-x-auto { touch-action: pan-x pan-y; }
 button, input, textarea { font: inherit; }
 button { transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease, color 160ms ease; }
 button:active { transform: scale(0.98); }
@@ -112,7 +118,7 @@ html:has(.workout-mode) #root {
   min-height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
-  touch-action: manipulation;
+  touch-action: pan-y;
 }
 
 .workout-mode-main {
@@ -279,6 +285,11 @@ button:focus-visible,
     padding-block: 0.3rem;
   }
   .workout-mode header h1 {
+    display: none;
+  }
+  /* A categoria do atleta sai do cabeçalho no celular: com ela os dois
+     seletores não cabiam. Continua no desktop. */
+  header .app-category-select {
     display: none;
   }
   .workout-mode header > div > div:last-child {

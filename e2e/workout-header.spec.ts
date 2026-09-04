@@ -130,3 +130,51 @@ test.describe("cabeçalho no modo de treino", () => {
     expect(header.y).toBeGreaterThanOrEqual(0);
   });
 });
+
+test.describe("enquadramento fixo no celular", () => {
+  test.beforeEach(async ({ page }) => {
+    await stubApi(page);
+    await page.goto("/");
+    await expect(page.locator(".workout-card-body")).toBeVisible();
+  });
+
+  test("bloqueia zoom por pinça e toque duplo, e só rola na vertical", async ({ page }) => {
+    const meta = await page.locator('meta[name="viewport"]').getAttribute("content");
+    expect(meta).toContain("user-scalable=no");
+    const touchAction = await page.evaluate(() => getComputedStyle(document.documentElement).touchAction);
+    expect(touchAction).toBe("pan-y");
+    // Dispositivo real: a guarda de gesto está instalada e cancela a pinça.
+    const cancelled = await page.evaluate(() => {
+      const event = new Event("gesturestart", { cancelable: true, bubbles: true });
+      document.body.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    expect(cancelled, "gesturestart não foi cancelado").toBe(true);
+  });
+
+  test("a biblioteca não fica mais larga que a tela e o rodapé é só ícones", async ({ page }) => {
+    await page.getByRole("button", { name: /voltar para a sequência/i }).click();
+    const footer = page.locator("footer");
+    await expect(footer).toBeVisible();
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+    expect(overflow, "biblioteca transborda na horizontal").toBe(false);
+
+    const buttons = footer.getByRole("button");
+    await expect(buttons).toHaveCount(3);
+    for (const name of [/gerar um wod/i, /criar um workout/i, /importar um workout/i]) {
+      const button = footer.getByRole("button", { name });
+      await expect(button).toBeVisible();
+      expect((await button.innerText()).trim(), "botão do rodapé com legenda").toBe("");
+      expect(await button.getAttribute("title"), "botão do rodapé com dica").toBeNull();
+    }
+  });
+
+  test("a categoria do atleta só aparece no cabeçalho do desktop", async ({ page }) => {
+    const category = page.getByLabel("Sua categoria");
+    const width = page.viewportSize()!.width;
+    if (width < 640) await expect(category).toBeHidden();
+    else await expect(category).toBeVisible();
+    await expect(page.getByLabel("Sair")).toBeVisible();
+  });
+});

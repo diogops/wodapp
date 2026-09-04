@@ -55,6 +55,20 @@ describe("workout demo UI contract", () => {
     expect(styles).not.toMatch(/\.workout-mode header\s*\{[\s\S]*?display:\s*none;/);
     expect(styles).toMatch(/@media \(max-width: 639px\)[\s\S]*?\.workout-mode header h1\s*\{[\s\S]*?display:\s*none;/);
     expect(styles).toMatch(/\.workout-mode header \[data-slot="select-trigger"\]\s*\{[\s\S]*?min-width:\s*0;/);
+    // A categoria sai do cabeçalho no celular: com dois seletores não cabia.
+    expect(styles).toMatch(/@media \(max-width: 639px\)[\s\S]*?header \.app-category-select\s*\{[\s\S]*?display:\s*none;/);
+    expect(readSource("client/src/pages/Home.tsx")).toContain('className="app-category-select');
+  });
+
+  it("locks the mobile framing: no pinch zoom, no sideways drift", () => {
+    // O iOS ignora `maximum-scale`; o que segura o enquadramento é o
+    // `touch-action: pan-y` no html mais a guarda de gestos no main.tsx.
+    const styles = readSource("client/src/index.css");
+    expect(styles).toMatch(/html\s*\{[^}]*touch-action:\s*pan-y;[^}]*overflow-x:\s*clip;/);
+    expect(styles).toMatch(/\.workout-mode\s*\{[\s\S]*?touch-action:\s*pan-y;/);
+    expect(styles).not.toMatch(/touch-action:\s*manipulation/);
+    expect(readSource("client/index.html")).toContain("user-scalable=no");
+    expect(readSource("client/src/main.tsx")).toContain("installZoomGuard(window)");
     // Sem o header global, o modo de treino ocupa o viewport inteiro.
     expect(styles).not.toContain("calc(100svh - 2.15rem)");
     // O Card do shadcn traz py-6 + gap-6; ambos precisam ser zerados.

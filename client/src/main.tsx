@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { installZoomGuard } from "@/lib/zoomGuard";
 import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
@@ -51,6 +52,10 @@ const trpcClient = trpc.createClient({
     }),
   ],
 });
+
+// O iOS ignora `maximum-scale`: sem isto, pinça e toque duplo ampliam a
+// página e ela passa a "andar" com o dedo. Ver zoomGuard.ts.
+installZoomGuard(window);
 
 // Registrado só em produção: em dev o service worker serviria bundle velho e
 // o HMR do Vite passaria a mentir sobre o estado do código.

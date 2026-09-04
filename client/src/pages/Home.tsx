@@ -179,47 +179,6 @@ function IconAction({
   );
 }
 
-/**
- * Botão de rótulo curto com a função completa na dica. Os rótulos são curtos
- * para os três caberem numa linha só no celular; o `title`/`aria-label` é o
- * que explica a ação, já que no toque o tooltip não abre.
- */
-function HintButton({
-  hint,
-  onClick,
-  disabled,
-  className,
-  variant,
-  children,
-}: {
-  hint: string;
-  onClick: () => void;
-  disabled?: boolean;
-  className?: string;
-  variant?: "outline";
-  children: React.ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          size="sm"
-          variant={variant}
-          className={`shrink-0 px-2.5 ${className ?? ""}`}
-          aria-label={hint}
-          title={hint}
-          disabled={disabled}
-          onClick={onClick}
-        >
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{hint}</TooltipContent>
-    </Tooltip>
-  );
-}
-
 // A imagem gravada no exercício (`imageUrl`, vinda do programa importado)
 // ganha da busca por nome: o mapa acima é o fallback para os WODs antigos.
 function getExerciseDemo(exercise: { name: string; imageUrl?: string | null }) {
@@ -616,7 +575,7 @@ export default function Home() {
               onValueChange={value => setCategory.mutate({ category: value })}
             >
               <SelectTrigger
-                className="h-8 w-[9.5rem] border-[#dedfd6] bg-white text-xs"
+                className="app-category-select h-8 w-[9.5rem] border-[#dedfd6] bg-white text-xs"
                 aria-label="Sua categoria"
               >
                 <SelectValue placeholder="Sua categoria" />
@@ -814,38 +773,44 @@ export default function Home() {
             não encostarem na barra de gestos nem na barra do navegador, que
             aparece e some conforme a rolagem. */}
         <div className="mx-auto flex max-w-6xl items-center justify-center gap-1.5 px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6">
-            {/* Uma linha só: com os rótulos longos os três quebravam em duas
-                no celular. A função completa vive na dica de cada botão. */}
-            <div className="flex flex-nowrap items-center gap-1.5">
-              <HintButton
-                hint="Gerar um WOD com a IA"
-                className="bg-[#e06b3c] text-white hover:bg-[#c8562c]"
+            {/* Só ícones, sem rótulo nem dica: os três cabem em qualquer
+                largura e o rodapé fica com cara de barra de app. O
+                `aria-label` continua para leitor de tela. */}
+            <div className="flex flex-nowrap items-center gap-2">
+              <Button
+                type="button"
+                size="icon"
+                className="h-11 w-11 rounded-full bg-[#e06b3c] text-white hover:bg-[#c8562c]"
+                aria-label="Gerar um WOD com a IA"
                 onClick={() => setShowSurprise(true)}
               >
-                <Sparkles className="mr-1.5 h-4 w-4" />
-                WOD surpresa
-              </HintButton>
-              <HintButton
-                hint="Criar um workout manualmente"
+                <Sparkles className="h-5 w-5" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
                 variant="outline"
+                className="h-11 w-11 rounded-full"
+                aria-label="Criar um workout manualmente"
                 onClick={() => setShowCreate(true)}
               >
-                <Plus className="mr-1.5 h-4 w-4" />
-                Novo
-              </HintButton>
-              <HintButton
-                hint="Importar um workout de um arquivo PDF"
+                <Plus className="h-5 w-5" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
                 variant="outline"
+                className="h-11 w-11 rounded-full"
+                aria-label="Importar um workout de um arquivo PDF"
                 disabled={importPdf.isPending}
                 onClick={() => fileRef.current?.click()}
               >
                 {importPdf.isPending ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
-                  <FileUp className="mr-1.5 h-4 w-4" />
+                  <FileUp className="h-5 w-5" />
                 )}
-                PDF
-              </HintButton>
+              </Button>
               <input
                 ref={fileRef}
                 type="file"
