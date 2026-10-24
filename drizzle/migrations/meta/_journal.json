@@ -64,6 +64,13 @@
       "when": 1792852036400,
       "tag": "0008_prioriza_musculacao",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792860611357,
+      "tag": "0009_demos_musculacao_jpg",
+      "breakpoints": true
     }
   ]
 }
