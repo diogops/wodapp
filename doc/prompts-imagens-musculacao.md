@@ -762,3 +762,399 @@ PHASES, one per panel from top to bottom:
 2. MIDDLE: knees bending and rising halfway, pelvis starting to tuck.
 3. END: top: knees at hip height or higher, thighs parallel to the floor, no swing.
 ```
+
+## Musculação v2 — exercícios novos
+
+O programa v2 (academia de musculação: barra só no rack ou Smith, halteres,
+máquinas e polias) reaproveita 16 imagens acima e precisa destas. O
+**Pause front squat** usa a imagem do Front squat (a pausa não aparece no
+desenho), então não tem prompt.
+
+### 34. Rack pull — `musculacao-rack-pull-fases.jpg`
+```text
+EXERCISE: Rack pull (barbell deadlift from the safety pins of a power rack).
+Camera: pure side profile from the athlete's left, eye level, so the back angle,
+the hips and the bar on the pins are clearly visible.
+Setup: a power rack with the safety pins set just below knee height; a loaded
+barbell (plates on both ends) rests on the pins. The bar never touches the floor.
+Body: overhand grip just outside the legs, arms straight, flat back, chest up.
+Must be correct: bar starts on the rack pins just below the knees, not on the
+floor; arms straight the whole time; back flat.
+Avoid: bar on the floor, rounded back, bent arms, leaning far back at the top.
+PHASES, one per panel from top to bottom:
+1. START: hips back, torso about 45 degrees, shoulders slightly in front of the bar resting on the pins just below the knees.
+2. MIDDLE: bar lifted to mid-thigh, hips moving forward, back flat, arms straight.
+3. END: standing tall, hips and knees fully extended, shoulders back, bar at the upper thighs.
+```
+
+### 35. Hack squat — `musculacao-hack-squat-fases.jpg`
+```text
+EXERCISE: Hack squat on a hack squat machine.
+Camera: pure side profile from the athlete's left, eye level, so knee and hip
+angles are clearly visible.
+Setup: a hack squat machine: an inclined sled rail with a padded back rest and
+two shoulder pads, and a large inclined foot platform at the bottom.
+Body: his back is flat against the angled back pad, shoulders under the shoulder
+pads, hands holding the side handles, feet shoulder-width in the middle of the
+platform.
+Must be correct: back on the angled pad the whole time; it is a machine, he
+stands on the platform and moves down the rail.
+Avoid: barbell, leg press (sitting and pushing a sled away), free squat.
+PHASES, one per panel from top to bottom:
+1. START: legs extended (knees soft), standing tall in the machine at the top of the rail.
+2. MIDDLE: knees bent about 90 degrees, back still on the pad.
+3. END: deep bottom, hips below the knees, heels flat on the platform, back on the pad.
+```
+
+### 36. Single-leg leg press — `musculacao-single-leg-leg-press-fases.jpg`
+```text
+EXERCISE: Single-leg leg press on a 45-degree leg press machine.
+Camera: pure side profile from the athlete's left, eye level.
+Setup: a 45-degree leg press machine: reclined seat and back pad, a plate-loaded
+sled with a large foot platform moving on a 45-degree rail.
+Body: he sits with his back and hips on the pad, hands on the side handles. Only
+his LEFT foot is on the middle of the platform; the right leg is relaxed with
+the right foot resting on the machine frame below the platform.
+Must be correct: only one foot on the platform; hips stay on the seat.
+Avoid: both feet on the platform, hack squat, standing.
+PHASES, one per panel from top to bottom:
+1. START: working leg extended (knee soft, not locked), sled at the top.
+2. MIDDLE: working knee bent about 90 degrees, sled halfway down.
+3. END: deep: working knee bent past 90 degrees toward the chest, hips still on the seat.
+```
+
+### 37. Seated leg curl — `musculacao-seated-leg-curl-fases.jpg`
+```text
+EXERCISE: Seated leg curl machine.
+Camera: pure side profile from the athlete's left, eye level.
+Setup: a seated leg curl machine: upright seat and back pad, a thigh pad
+clamping the thighs from above, and a padded roller behind the lower calves.
+Body: he sits upright, thighs held down by the thigh pad, hands on the side
+handles, the roller behind his ankles.
+Must be correct: he is SEATED; legs start straight out in front and bend down
+and back under the seat.
+Avoid: lying face down (lying leg curl), leg extension (roller on the front of
+the shins).
+PHASES, one per panel from top to bottom:
+1. START: legs almost straight out in front, roller behind the lower calves.
+2. MIDDLE: knees bent about 45 degrees, heels moving down.
+3. END: knees bent about 100 degrees, heels pulled under the seat.
+```
+
+### 38. Leg extension — `musculacao-leg-extension-fases.jpg`
+```text
+EXERCISE: Leg extension machine.
+Camera: pure side profile from the athlete's left, eye level.
+Setup: a leg extension machine: upright seat and back pad, a padded roller in
+front of the lower shins near the ankles.
+Body: he sits upright, back on the pad, hands on the side handles, knees at the
+edge of the seat.
+Must be correct: the roller is on the FRONT of the shins; he straightens the
+knees by lifting the roller.
+Avoid: leg curl (roller behind the calves), standing.
+PHASES, one per panel from top to bottom:
+1. START: knees bent 90 degrees, feet under the knees, roller on the front of the ankles.
+2. MIDDLE: lower legs halfway up, knees bent about 45 degrees.
+3. END: legs fully straight and horizontal, held at the top.
+```
+
+### 39. Dumbbell reverse lunge — `musculacao-dumbbell-reverse-lunge-fases.jpg`
+```text
+EXERCISE: Dumbbell reverse lunge (stepping backward).
+Camera: pure side profile from the athlete's left, eye level.
+Setup: one dumbbell in each hand.
+Body: dumbbells hang at his sides with straight arms, torso upright.
+Must be correct: the RIGHT leg steps BACKWARD; the front foot stays in place.
+Avoid: stepping forward, walking lunge, barbell on the back.
+PHASES, one per panel from top to bottom:
+1. START: standing tall, feet together, dumbbells at the sides.
+2. MIDDLE: right foot stepping back and landing on its toes, both knees starting to bend.
+3. END: bottom: back knee just above the floor, front thigh parallel to the floor, front shin nearly vertical, torso upright.
+```
+
+### 40. Chest-supported T-bar row — `musculacao-chest-supported-t-bar-row-fases.jpg`
+```text
+EXERCISE: Chest-supported T-bar row machine.
+Camera: pure side profile from the athlete's left, eye level, so the elbows
+travelling behind the torso are visible.
+Setup: a chest-supported T-bar row machine: an inclined chest pad, a foot
+platform, and a plate-loaded lever arm with handles below the pad.
+Body: he stands on the platform with his chest resting on the inclined pad,
+torso about 45 degrees, holding the handles below him.
+Must be correct: chest stays on the pad; pulling the elbows back past the torso.
+Avoid: bent-over barbell row without the pad, seated cable row, standing upright.
+PHASES, one per panel from top to bottom:
+1. START: arms straight, hanging down holding the handles, shoulder blades spread.
+2. MIDDLE: elbows bent halfway, pulling back.
+3. END: elbows pulled behind the torso, handles at the lower ribs, shoulder blades squeezed, chest still on the pad.
+```
+
+### 41. Straight-arm cable pulldown — `musculacao-straight-arm-cable-pulldown-fases.jpg`
+```text
+EXERCISE: Straight-arm cable pulldown.
+Camera: pure side profile from the athlete's left, eye level, the cable tower on
+the right edge of the frame.
+Setup: a cable tower with the pulley at the top and a straight bar attachment.
+Body: he stands facing the tower, feet hip-width, slight forward hip hinge
+(torso leaning about 20 degrees), overhand grip on the bar.
+Must be correct: the elbows stay nearly straight in all three panels; the arms
+swing down from the shoulders like a pendulum.
+Avoid: bent elbows (triceps pushdown), lat pulldown seated, kneeling.
+PHASES, one per panel from top to bottom:
+1. START: arms straight, reaching forward and up, bar at eye level.
+2. MIDDLE: arms straight, bar pushed down to chest level.
+3. END: arms straight, bar touching the front of the thighs, lats squeezed.
+```
+
+### 42. Cable hammer curl — `musculacao-cable-hammer-curl-fases.jpg`
+```text
+EXERCISE: Cable hammer curl with a rope.
+Camera: three-quarter front view from the athlete's front-left, eye level, so
+the neutral grip (thumbs up) is visible.
+Setup: a cable tower with the pulley at the bottom and a rope attachment.
+Body: he stands tall facing the tower, holding one end of the rope in each hand
+with a neutral grip (palms facing each other, thumbs up), elbows pinned to the
+sides.
+Must be correct: neutral grip with thumbs up; elbows stay at the sides.
+Avoid: palms-up barbell curl, elbows moving forward, swinging the torso.
+PHASES, one per panel from top to bottom:
+1. START: arms straight down, rope ends beside the thighs.
+2. MIDDLE: forearms horizontal, elbows bent 90 degrees.
+3. END: rope ends near the front of the shoulders, elbows still at the sides.
+```
+
+### 43. Overhead cable triceps extension — `musculacao-overhead-cable-triceps-extension-fases.jpg`
+```text
+EXERCISE: Overhead cable triceps extension with a rope.
+Camera: pure side profile from the athlete's left, eye level, the cable tower on
+the left edge of the frame behind him.
+Setup: a cable tower with the pulley at head height and a rope attachment.
+Body: he stands facing AWAY from the tower in a staggered stance, leaning
+slightly forward; the rope passes over his head, both hands hold the rope ends
+behind his head, upper arms beside the head pointing forward-up.
+Must be correct: the upper arms stay still beside the head; only the forearms
+move; he faces away from the machine.
+Avoid: triceps pushdown (facing the tower, pushing down), dumbbell.
+PHASES, one per panel from top to bottom:
+1. START: elbows fully bent, hands behind the head, elbows pointing forward and up.
+2. MIDDLE: forearms halfway extended.
+3. END: arms fully straight, reaching forward and up overhead, elbows locked.
+```
+
+### 44. Cable crunch — `musculacao-cable-crunch-fases.jpg`
+```text
+EXERCISE: Kneeling cable crunch.
+Camera: pure side profile from the athlete's left, eye level, the cable tower on
+the right edge of the frame.
+Setup: a cable tower with the pulley at the top and a rope attachment.
+Body: he kneels on the floor facing the tower, hips above the knees, holding the
+rope ends beside his forehead.
+Must be correct: the hips stay above the knees; the movement is the spine
+curling down.
+Avoid: sitting back on the heels, standing, pulling with the arms.
+PHASES, one per panel from top to bottom:
+1. START: kneeling tall, torso upright, rope beside the forehead.
+2. MIDDLE: spine rounding forward, elbows halfway down.
+3. END: fully curled, elbows close to the thighs, hips still above the knees.
+```
+
+### 45. Dumbbell shrug — `musculacao-dumbbell-shrug-fases.jpg`
+```text
+EXERCISE: Dumbbell shrug.
+Camera: straight front view, eye level, so both shoulders rising are visible.
+Setup: one heavy dumbbell in each hand.
+Body: standing tall, feet hip-width, dumbbells at his sides, palms facing the
+thighs.
+Must be correct: arms stay straight; only the shoulders move straight up.
+Avoid: bending the elbows (upright row), rolling the shoulders, barbell.
+PHASES, one per panel from top to bottom:
+1. START: shoulders relaxed down, arms straight, dumbbells at the sides.
+2. MIDDLE: shoulders halfway up.
+3. END: shoulders lifted toward the ears, arms still straight.
+```
+
+### 46. Push press — `musculacao-push-press-fases.jpg`
+```text
+EXERCISE: Barbell push press.
+Camera: pure side profile from the athlete's left, eye level, so the dip of the
+knees and the bar path over the mid-foot are visible.
+Setup: a loaded barbell (plates on both ends).
+Body: the bar starts in the front rack on the front of the shoulders, hands just
+outside shoulder-width, elbows slightly in front of the bar.
+Must be correct: short vertical dip with the torso upright; the bar finishes
+locked out directly over the mid-foot.
+Avoid: a deep squat in any panel (the dip is only a slight knee bend, thighs far from parallel), split jerk, bar starting on the upper back, a box or background behind any panel.
+PHASES, one per panel from top to bottom:
+1. START: standing tall, bar on the front of the shoulders.
+2. MIDDLE: short quarter dip: knees only slightly bent (about 20 degrees, thighs nearly vertical), torso vertical, heels flat, bar still on the shoulders.
+3. END: legs straight, bar locked out overhead over the mid-foot, arms straight, head through the arms.
+```
+
+### 47. Back squat — `musculacao-back-squat-fases.jpg`
+```text
+EXERCISE: High-bar back squat.
+Camera: three-quarter view from the athlete's front-left, eye level, so the bar
+on the upper back and the depth are visible.
+Setup: a loaded barbell (plates on both ends).
+Body: the bar rests on the upper back (upper trapezius) behind the neck, hands
+gripping it just outside the shoulders, elbows pointing down, feet
+shoulder-width, toes slightly out.
+Must be correct: bar on the upper BACK behind the neck.
+Avoid: bar on the front of the shoulders (front squat), arms overhead, rounded back.
+PHASES, one per panel from top to bottom:
+1. START: standing tall with the bar on the upper back.
+2. MIDDLE: halfway down, knees bent about 90 degrees, chest up.
+3. END: bottom: hips below the knees, heels flat, back flat, chest up.
+```
+
+### 48. Snatch-grip Romanian deadlift — `musculacao-snatch-grip-romanian-deadlift-fases.jpg`
+```text
+EXERCISE: Snatch-grip Romanian deadlift.
+Camera: three-quarter view from the athlete's front-left, eye level, so the very
+wide grip and the hip hinge are both visible.
+Setup: a loaded barbell (plates on both ends).
+Body: very wide overhand snatch grip: the hands are near the ends of the bar,
+close to the plates, about twice shoulder-width, so the arms form a wide V;
+arms straight, knees soft, back flat.
+Must be correct: very wide grip; the movement is the hips going back with a
+flat back; the bar slides along the thighs.
+Avoid: hands at shoulder width or next to the thighs (that is a normal deadlift grip), squatting down, rounded back, bar touching the floor.
+PHASES, one per panel from top to bottom:
+1. START: standing tall, bar at the hips with a very wide grip.
+2. MIDDLE: hips moving back, bar sliding down to mid-thigh, back flat.
+3. END: bottom: hips far back, torso about 45 degrees, bar just below the knees, back flat.
+```
+
+### 49. Seated dumbbell shoulder press — `musculacao-seated-dumbbell-shoulder-press-fases.jpg`
+```text
+EXERCISE: Seated dumbbell shoulder press.
+Camera: three-quarter front view from the athlete's front-left, eye level.
+Setup: an adjustable bench with the back pad almost upright; one dumbbell in
+each hand.
+Body: he sits with his back against the pad, feet flat on the floor.
+Must be correct: seated with back support; elbows under the wrists.
+Avoid: standing, barbell, machine.
+PHASES, one per panel from top to bottom:
+1. START: dumbbells beside the ears, elbows bent below the wrists.
+2. MIDDLE: arms halfway up.
+3. END: arms straight overhead, dumbbells close together above the head.
+```
+
+### 50. 45-degree back extension — `musculacao-45-degree-back-extension-fases.jpg`
+```text
+EXERCISE: 45-degree back extension (hyperextension bench).
+Camera: pure side profile from the athlete's left, eye level.
+Setup: a 45-degree back extension bench: an angled frame with a foot platform,
+ankle rollers and a hip pad. He holds a weight plate against his chest.
+Body: feet on the platform under the ankle rollers, the hip pad at the top of
+the thighs so he can bend at the hips.
+Must be correct: the bench is angled at 45 degrees; at the top the body is a
+straight line, not arched.
+Avoid: flat Roman chair at 90 degrees, GHD, lying on the floor, over-arching at the top.
+PHASES, one per panel from top to bottom:
+1. START: bent forward at the hips over the pad, head pointing almost straight down at the floor, torso nearly vertical downward, back flat.
+2. MIDDLE: torso halfway up, about horizontal.
+3. END: body in a straight line from heels to head along the 45-degree angle.
+```
+
+### 51. Hip thrust — `musculacao-hip-thrust-fases.jpg`
+```text
+EXERCISE: Hip thrust on a hip thrust machine.
+Camera: pure side profile from the athlete's left, eye level.
+Setup: a Smith machine with the bar across the front of his hips (a pad on the
+bar) and a flat bench placed sideways behind him.
+Body: only his upper back (shoulder blades) rests on the edge of the flat bench;
+his hips are free in the air, feet flat on the floor about hip-width, knees bent,
+chin tucked, hands holding the bar beside the hips.
+Must be correct: he is NOT sitting; only the upper back touches the bench; the
+hips move straight up and down; at the top the shins are vertical and the
+torso and thighs form one straight horizontal line like a table.
+Avoid: sitting in a seat, reclining in a chair, leg press, glute bridge with the back on the floor, arching the lower back.
+PHASES, one per panel from top to bottom:
+1. START: hips dropped down close to the floor, upper back on the bench edge, knees bent more than 90 degrees.
+2. MIDDLE: hips halfway up, thighs angled upward from the knees.
+3. END: hips pushed up to the height of the bench top: the body from the knees to the shoulders is one flat horizontal plank, shins vertical, the Smith bar lifted with the hips. This panel must look clearly different from the START: the hips are far higher.
+```
+
+### 52. Hip adductor machine — `musculacao-hip-adductor-machine-fases.jpg`
+```text
+EXERCISE: Hip adductor machine (squeezing the legs together).
+Camera: straight front view, eye level, so both legs are visible.
+Setup: a seated hip adductor machine: upright seat, two leg arms with pads on
+the INSIDE of the knees.
+Body: he sits upright, back on the pad, hands on the side handles.
+Must be correct: pads on the inside of the knees; the legs move from wide apart
+to together.
+Avoid: pads on the outside of the knees (abduction), standing.
+PHASES, one per panel from top to bottom:
+1. START: legs wide apart, pads pressing on the inside of the knees.
+2. MIDDLE: legs halfway closed.
+3. END: knees together.
+```
+
+### 53. Hip abduction machine — `musculacao-hip-abduction-machine-fases.jpg`
+```text
+EXERCISE: Hip abduction machine (pushing the legs apart).
+Camera: straight front view, eye level, so both legs are visible.
+Setup: a seated hip abduction machine: upright seat, two leg arms with pads on
+the OUTSIDE of the knees.
+Body: he sits with the torso leaning slightly forward, hands on the side handles.
+Must be correct: pads on the outside of the knees; the legs move from together
+to wide apart.
+Avoid: pads on the inside of the knees (adduction), standing, white frames or boxes around the panels.
+PHASES, one per panel from top to bottom:
+1. START: knees together, pads on the outside of the knees.
+2. MIDDLE: legs halfway open.
+3. END: legs wide apart.
+```
+
+### 54. Cable Y-raise — `musculacao-cable-y-raise-fases.jpg`
+```text
+EXERCISE: Cable Y-raise.
+Camera: straight front view, eye level, so the Y shape of the arms is visible.
+Setup: two cable towers with the pulleys at the bottom and single handles; the
+cables cross in front of him.
+Body: he stands between the towers, the left hand holding the right cable and
+the right hand holding the left cable, arms straight, thumbs up.
+Must be correct: arms stay straight; at the end the arms form a Y overhead, not
+a T and not straight up.
+Avoid: lateral raise to a T, bent elbows, dumbbells.
+PHASES, one per panel from top to bottom:
+1. START: arms straight, hands crossed in front of the hips.
+2. MIDDLE: arms rising diagonally, hands at shoulder height.
+3. END: arms straight overhead in a Y shape, thumbs up.
+```
+
+### 55. Reverse pec deck — `musculacao-reverse-pec-deck-fases.jpg`
+```text
+EXERCISE: Reverse pec deck (rear delt fly on the machine).
+Camera: three-quarter rear view from behind his left shoulder, slightly above,
+so the arms opening and the shoulder blades are visible.
+Setup: a pec deck machine used in reverse: he sits BACKWARDS on the seat,
+facing the upright pad and the weight stack, with his CHEST pressed against the
+pad; the two handles are in front of the pad at shoulder height. We see his back.
+Body: chest on the pad, arms almost straight at shoulder height holding the
+handles in front of the pad.
+Must be correct: his back faces the camera and his chest is on the pad; the
+arms swing backward and out to the sides.
+Avoid: sitting with his back against the pad (regular chest fly), bent-over dumbbells, standing.
+PHASES, one per panel from top to bottom:
+1. START: arms straight forward, hands together in front of the chest.
+2. MIDDLE: arms opening halfway out to the sides.
+3. END: arms open in line with the shoulders in a T, shoulder blades squeezed.
+```
+
+### 56. Dumbbell goblet squat — `musculacao-dumbbell-goblet-squat-fases.jpg`
+```text
+EXERCISE: Dumbbell goblet squat.
+Camera: three-quarter view from the athlete's front-left, eye level.
+Setup: one dumbbell held vertically against the chest with both hands cupping
+the top end.
+Body: feet shoulder-width, toes slightly out, elbows pointing down.
+Must be correct: dumbbell held at the chest; deep squat with an upright torso.
+Avoid: barbell, kettlebell swing, dumbbells at the sides.
+PHASES, one per panel from top to bottom:
+1. START: standing tall, dumbbell at the chest.
+2. MIDDLE: halfway down, knees bent about 90 degrees.
+3. END: deep bottom, elbows inside the knees, torso upright, heels flat.
+```
