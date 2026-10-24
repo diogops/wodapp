@@ -29,7 +29,7 @@ function ex(name: string, prescription: string, transfer: string, equipment: str
     name, prescription, sets, load,
     ...(timed ? { duration: dose } : { reps: dose }),
     notes: `${transfer} Equipamento: ${equipment}. Alternativa: ${alternative}.`,
-    imageUrl: `/demos/musculacao-${slug(name)}.png`,
+    imageUrl: `/demos/musculacao-${slug(name)}.jpg`,
   };
 }
 

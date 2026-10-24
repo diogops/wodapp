@@ -139,3 +139,9 @@ doc/treinos_fortalecimento_crossfit.pdf
 # PDF fonte do programa de musculação: a transcrição está em
 # server/programs/musculacao.ts e as figuras foram redesenhadas; repositório público.
 doc/workouts-crossfit-ilustrados.pdf
+
+# Saída de scripts/generate-demos-gemini.py, revisada antes de ir para client/public/demos.
+.demos-gemini/
+
+# Chave do Gemini colocada à mão: nunca entra no repositório (público).
+doc/chave_Gemini.txt

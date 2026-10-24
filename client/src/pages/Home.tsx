@@ -1192,36 +1192,12 @@ function Today({
                     </span>
                   )}
                 </div>
-                {section.kind === "straight_sets"
-                  ? (section.exercises ?? []).map((exercise: any) => {
-                      const plan = parseSetPlan(exercise);
-                      if (!plan) return null;
-                      const exerciseId = String(exercise.id);
-                      return (
-                        <SetTracker
-                          key={`sets-${exercise.id}`}
-                          exerciseName={exercise.name}
-                          plan={plan}
-                          suggestedLoad={lastLoads[exercise.name] ?? exercise.load ?? undefined}
-                          onLogSet={entry =>
-                            current &&
-                            logSet.mutate({
-                              workoutId: current.id,
-                              exerciseName: exercise.name,
-                              setIndex: entry.setIndex,
-                              load: entry.load,
-                            })
-                          }
-                          onFinish={() => markDone(exerciseId)}
-                        />
-                      );
-                    })
-                  : null}
                 {section.exercises?.map((exercise: any) => {
                   const exerciseId = String(exercise.id);
-                  // O SetTracker já cuida deste exercício quando o bloco é de
-                  // séries; mostrar as duas formas confundiria o que registrar.
-                  if (section.kind === "straight_sets" && parseSetPlan(exercise)) return null;
+                  // Todo exercício tem a mesma linha (nome, prescrição, feito,
+                  // timer, demonstração); bloco de séries só acrescenta o
+                  // registro de séries embaixo dela.
+                  const plan = section.kind === "straight_sets" ? parseSetPlan(exercise) : null;
                   const seconds = parseDurationToSeconds(exercise.duration, exercise.prescription);
                   const done = doneExercises.has(exerciseId);
                   const paused = timer?.exerciseId === exerciseId && timer.status === "paused";
@@ -1289,6 +1265,24 @@ function Today({
                         </Button>
                       </div>
                     </div>
+                    {plan && (
+                      <SetTracker
+                        exerciseName={exercise.name}
+                        plan={plan}
+                        suggestedLoad={lastLoads[exercise.name]}
+                        loadHint={exercise.load ?? undefined}
+                        onLogSet={entry =>
+                          current &&
+                          logSet.mutate({
+                            workoutId: current.id,
+                            exerciseName: exercise.name,
+                            setIndex: entry.setIndex,
+                            load: entry.load,
+                          })
+                        }
+                        onFinish={() => markDone(exerciseId)}
+                      />
+                    )}
                   </div>
                   );
                 })}
@@ -1526,7 +1520,8 @@ function Library({ workouts, completedIds, onMove, onEdit, onDelete, onSelect, o
       ) : (
         <div className="space-y-2.5">
           {workouts.map((workout: any, index: number) => (
-            <Card key={workout.id} className="gap-0 border-[#dedfd6] bg-white py-0">
+            // Zebrado: na fila longa (24 treinos de musculação) linhas iguais se confundem.
+            <Card key={workout.id} className={`gap-0 border-[#dedfd6] py-0 ${index % 2 ? "bg-[#f6ede6]" : "bg-white"}`}>
               {/* Nome em linha inteira, ações numa linha própria abaixo e
                   centradas. Dividir a largura com seis botões truncava o título
                   do WOD no celular, sem nenhuma forma de ler o nome completo. */}

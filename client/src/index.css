@@ -425,10 +425,12 @@ button:focus-visible,
   .workout-mode .workout-card-body > .workout-notes {
     flex: 0 0 auto;
   }
+  /* A linha tem a altura do conteúdo. Com teto de altura (era 3.4rem), nome
+     longo em 320px e o registro de séries vazavam por cima da seção seguinte;
+     o espaço que sobra fica no fim da seção. */
   .workout-mode .workout-exercise-row {
     display: flex;
-    flex: 1 0 auto;
-    max-height: 3.4rem;
+    flex: 0 0 auto;
     flex-direction: column;
     justify-content: center;
   }
