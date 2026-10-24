@@ -6,7 +6,7 @@ import { buildLoadProgression, buildWeeklyVolume, summarizeByModality } from "@s
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createWorkout, deleteDraft, deleteScheduleRule, deleteWorkout, ensureDefaultWorkouts, ensureProgramWorkouts, getDraft, getHistoryStatsRows, getOpeningSignals, getScheduleRules, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, ensureModalities, backfillSectionKinds, getLastLoads, getModalities, logSet, recordSession, renameWorkout, saveDraft, saveScheduleRule, setOpeningPrefs, setUserCategory, updateWorkoutOrder } from "./db";
+import { createWorkout, deleteDraft, deleteScheduleRule, deleteWorkout, ensureDefaultWorkouts, ensureProgramWorkouts, getDraft, getHistoryStatsRows, getOpeningSignals, getScheduleRules, getSectionTitles, getSessionHistory, getWorkoutForUser, getWorkoutsForUser, ensureModalities, backfillSectionKinds, getLastLoads, getModalities, logSet, prioritizeModality, recordSession, renameWorkout, saveDraft, saveScheduleRule, setOpeningPrefs, setUserCategory, updateWorkoutOrder } from "./db";
 import { storagePut } from "./storage";
 import { isCatalogExercise, isFocusArea } from "@shared/exerciseCatalog";
 import { extractWorkoutFromPdf, generateWorkout } from "./llm";
@@ -65,6 +65,9 @@ export const appRouter = router({
         scheduleGraceMinutes: z.number().int().min(0).max(240).optional(),
       }))
       .mutation(({ ctx, input }) => setOpeningPrefs(ctx.user.id, input)),
+    prioritize: protectedProcedure
+      .input(z.object({ modalityId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) => prioritizeModality(ctx.user.id, input.modalityId)),
   }),
   workouts: router({
     list: protectedProcedure.query(async ({ ctx }) => {

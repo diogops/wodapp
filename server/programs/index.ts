@@ -1,5 +1,6 @@
 import type { BlockKind } from "@shared/modalities";
 import { FORTALECIMENTO_PROGRAM } from "./fortalecimento";
+import { MUSCULACAO_PROGRAM } from "./musculacao";
 
 /**
  * Programa transcrito de um PDF e semeado por `ensureProgramWorkouts`. É dado,
@@ -41,7 +42,13 @@ export type SeedProgram = {
   /** Identidade do seed: um workout do usuário com este nome já conta como semeado. */
   sourceFileName: string;
   durationMinutes: number;
+  /**
+   * Uma regra só, sem treino preferido, para todos estes dias: o motor de
+   * abertura entrega o próximo da fila. Para séries em que a ordem importa
+   * mais que o dia; nesse caso os treinos têm `weekday` nulo.
+   */
+  scheduleWeekdays?: number[];
   workouts: SeedWorkout[];
 };
 
-export const SEED_PROGRAMS: SeedProgram[] = [FORTALECIMENTO_PROGRAM];
+export const SEED_PROGRAMS: SeedProgram[] = [FORTALECIMENTO_PROGRAM, MUSCULACAO_PROGRAM];

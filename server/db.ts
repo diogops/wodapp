@@ -129,6 +129,15 @@ export async function getModalities(userId: number) {
   return ensureModalities(userId);
 }
 
+/** Põe a modalidade no topo da ordem — é essa ordem que desempata dias com mais de um treino. */
+export async function prioritizeModality(userId: number, modalityId: number) {
+  const db = await getDb();
+  const owned = await ensureModalities(userId);
+  if (!owned.some(modality => modality.id === modalityId)) throw new Error("Modalidade não encontrada");
+  const top = Math.min(...owned.map(modality => modality.orderIndex));
+  await db.update(modalities).set({ orderIndex: top - 1 }).where(and(eq(modalities.id, modalityId), eq(modalities.userId, userId)));
+}
+
 /**
  * Deriva `kind` das seções que ainda não têm, a partir do `format` livre.
  * Separado do backfill de modalidade porque pode não haver correspondência —
@@ -235,7 +244,9 @@ export async function ensureProgramWorkouts(userId: number) {
     // editada pelo usuário vale mais do que o dia sugerido pelo programa.
     const rules = await db.select({ id: scheduleRules.id }).from(scheduleRules).where(and(eq(scheduleRules.userId, userId), eq(scheduleRules.modalityId, modality.id)));
     if (!rules.length) {
-      const values = created.filter(item => item.weekday !== null).map(item => ({ userId, modalityId: modality.id, weekdays: String(item.weekday), startTime: null, durationMinutes: program.durationMinutes, preferredWorkoutId: item.id, enabled: true }));
+      const values = program.scheduleWeekdays
+        ? [{ userId, modalityId: modality.id, weekdays: program.scheduleWeekdays.join(","), startTime: null, durationMinutes: program.durationMinutes, preferredWorkoutId: null, enabled: true }]
+        : created.filter(item => item.weekday !== null).map(item => ({ userId, modalityId: modality.id, weekdays: String(item.weekday), startTime: null, durationMinutes: program.durationMinutes, preferredWorkoutId: item.id, enabled: true }));
       if (values.length) await db.insert(scheduleRules).values(values);
     }
     seeded = true;
@@ -511,28 +522,31 @@ export async function getOpeningSignals(userId: number, sinceDays = 30) {
       workoutId: workoutSessions.workoutId,
       performedAt: workoutSessions.performedAt,
       modalityId: workouts.modalityId,
+      action: workoutSessions.action,
     })
     .from(workoutSessions)
     .leftJoin(workouts, eq(workoutSessions.workoutId, workouts.id))
-    .where(and(eq(workoutSessions.userId, userId), eq(workoutSessions.action, "completed")));
+    .where(eq(workoutSessions.userId, userId));
 
   const cutoff = Date.now() - sinceDays * 86_400_000;
   const lastPerformedAt: Record<number, string> = {};
   const recentUseByModality: Record<number, number> = {};
 
+  // Pular também move o treino para o fim da rotação — senão o domingo
+  // opcional pulado voltaria na terça. Uso e "última modalidade" contam só o feito.
   for (const row of rows) {
     const performed = row.performedAt?.getTime() ?? 0;
     const current = lastPerformedAt[row.workoutId];
     if (!current || new Date(current).getTime() < performed) {
       lastPerformedAt[row.workoutId] = new Date(performed).toISOString();
     }
-    if (row.modalityId && performed >= cutoff) {
+    if (row.action === "completed" && row.modalityId && performed >= cutoff) {
       recentUseByModality[row.modalityId] = (recentUseByModality[row.modalityId] ?? 0) + 1;
     }
   }
 
   const lastModality = rows
-    .filter(row => row.modalityId)
+    .filter(row => row.action === "completed" && row.modalityId)
     .sort((a, b) => (b.performedAt?.getTime() ?? 0) - (a.performedAt?.getTime() ?? 0))[0];
 
   return { lastPerformedAt, recentUseByModality, lastUsedModalityId: lastModality?.modalityId ?? null };

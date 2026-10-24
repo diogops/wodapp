@@ -138,6 +138,36 @@ describe("resolveOpening — um caso por ResolutionReason", () => {
     expect(result).toMatchObject({ kind: "picker", reason: "multiple_today" });
   });
 
+  it("prioritized_today → dia com regras sem horário abre a modalidade prioritária", () => {
+    const rules = [
+      { id: 1, modalityId: 1, weekdays: [2], startTime: null, durationMinutes: 60, preferredWorkoutId: null, enabled: true },
+      { id: 2, modalityId: 2, weekdays: [2], startTime: null, durationMinutes: 60, preferredWorkoutId: null, enabled: true },
+    ];
+    const modalities = [{ ...crossfit, orderIndex: 0 }, { ...strength, orderIndex: -1 }];
+    const result = resolveOpening(at("2026-08-18T18:00:00"), state({ modalities, rules }), prefs);
+    expect(result).toMatchObject({ kind: "auto", reason: "prioritized_today", modality: { id: 2 }, workout: { id: 20 } });
+  });
+
+  it("prioridade empatada continua perguntando", () => {
+    const rules = [
+      { id: 1, modalityId: 1, weekdays: [2], startTime: null, durationMinutes: 60, preferredWorkoutId: null, enabled: true },
+      { id: 2, modalityId: 2, weekdays: [2], startTime: null, durationMinutes: 60, preferredWorkoutId: null, enabled: true },
+    ];
+    const modalities = [{ ...crossfit, orderIndex: 0 }, { ...strength, orderIndex: 0 }];
+    const result = resolveOpening(at("2026-08-18T18:00:00"), state({ modalities, rules }), prefs);
+    expect(result).toMatchObject({ kind: "picker", reason: "multiple_today" });
+  });
+
+  it("janela de horário ainda ganha da prioridade", () => {
+    const rules = [
+      { id: 1, modalityId: 1, weekdays: [2], startTime: "18:00", durationMinutes: 60, preferredWorkoutId: null, enabled: true },
+      { id: 2, modalityId: 2, weekdays: [2], startTime: "07:00", durationMinutes: 60, preferredWorkoutId: null, enabled: true },
+    ];
+    const modalities = [{ ...crossfit, orderIndex: 0 }, { ...strength, orderIndex: -1 }];
+    const result = resolveOpening(at("2026-08-18T18:10:00"), state({ modalities, rules }), prefs);
+    expect(result).toMatchObject({ kind: "auto", reason: "time_window_match", modality: { id: 1 } });
+  });
+
   it("nothing_scheduled → picker com todas, ordenadas", () => {
     const rules = [
       // Regra de segunda, e hoje é quarta.

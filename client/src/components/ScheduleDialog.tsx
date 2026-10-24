@@ -61,6 +61,10 @@ export function ScheduleDialog({
     onSuccess: () => { refresh(); toast.success("Regra removida"); },
   });
   const setPrefs = trpc.schedule.setPrefs.useMutation({ onSuccess: refresh });
+  const prioritize = trpc.schedule.prioritize.useMutation({
+    onSuccess: () => { void utils.workouts.modalities.invalidate(); toast.success("Prioridade atualizada"); },
+    onError: error => toast.error(error.message),
+  });
 
   const week = useMemo(
     () => buildWeekPreview(rules, prefs.scheduleGraceMinutes),
@@ -311,6 +315,21 @@ export function ScheduleDialog({
                 onChange={event => setPrefs.mutate({ autoStartEnabled: event.target.checked })}
               />
               Cair direto no treino da agenda
+            </label>
+            {/* As modalidades chegam ordenadas por orderIndex: a primeira é a prioritária. */}
+            <label className="block text-xs text-[#6d746a]">
+              Dia com mais de um treino sem horário: abrir
+              <Select
+                value={modalities[0] ? String(modalities[0].id) : undefined}
+                onValueChange={value => prioritize.mutate({ modalityId: Number(value) })}
+              >
+                <SelectTrigger className="mt-1 w-full" aria-label="Modalidade prioritária"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {modalities.map(modality => (
+                    <SelectItem key={modality.id} value={String(modality.id)}>{modality.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
             <div className="flex items-center gap-2">
               <label className="flex-1 text-xs text-[#6d746a]">

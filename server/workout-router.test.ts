@@ -19,6 +19,7 @@ const dbMocks = vi.hoisted(() => ({
   ensureModalities: vi.fn(),
   backfillSectionKinds: vi.fn(),
   getModalities: vi.fn(),
+  prioritizeModality: vi.fn(),
 }));
 const storageMocks = vi.hoisted(() => ({ storagePut: vi.fn() }));
 const llmMocks = vi.hoisted(() => ({ extractWorkoutFromPdf: vi.fn(), generateWorkout: vi.fn() }));

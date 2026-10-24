@@ -135,3 +135,7 @@ client_secret*.json
 # dez imagens úteis já estão em client/public/demos/fortalecimento-*.jpg e a
 # transcrição em server/programs/fortalecimento.ts; o repositório é público.
 doc/treinos_fortalecimento_crossfit.pdf
+
+# PDF fonte do programa de musculação: a transcrição está em
+# server/programs/musculacao.ts e as figuras foram redesenhadas; repositório público.
+doc/workouts-crossfit-ilustrados.pdf

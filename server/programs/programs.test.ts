@@ -5,6 +5,7 @@ import { BUILT_IN_MODALITIES } from "@shared/modalities";
 import { workoutSchema } from "../routers";
 import { SEED_PROGRAMS } from "./index";
 import { FORTALECIMENTO_IMAGE_URLS, FORTALECIMENTO_PROGRAM } from "./fortalecimento";
+import { MUSCULACAO_PROGRAM } from "./musculacao";
 
 const PUBLIC_DIR = path.resolve(__dirname, "../../client/public");
 
@@ -92,5 +93,40 @@ describe("programa de fortalecimento", () => {
         }
       }
     }
+  });
+});
+
+describe("programa de musculação", () => {
+  it("tem as 6 semanas do PDF, cada uma com ter/qui/sex e domingo opcional", () => {
+    expect(MUSCULACAO_PROGRAM.workouts).toHaveLength(24);
+    const days = MUSCULACAO_PROGRAM.workouts.map(w => w.title.match(/^S(\d) · (\w{3})/)!.slice(1).join(" "));
+    expect(days).toEqual([1, 2, 3, 4, 5, 6].flatMap(week => ["Ter", "Qui", "Sex", "Dom"].map(day => `${week} ${day}`)));
+    expect(MUSCULACAO_PROGRAM.workouts.filter(w => w.notes?.includes("Opcional"))).toHaveLength(6);
+  });
+
+  it("fica numa regra de agenda só, sem prender treino a dia", () => {
+    expect(MUSCULACAO_PROGRAM.scheduleWeekdays).toEqual([0, 2, 4, 5]);
+    expect(MUSCULACAO_PROGRAM.workouts.every(w => w.weekday === null)).toBe(true);
+  });
+
+  it("dá séries, dose e imagem desenhada a todo exercício", () => {
+    for (const workout of MUSCULACAO_PROGRAM.workouts) {
+      for (const section of workout.sections) {
+        for (const exercise of section.exercises) {
+          expect(Number(exercise.sets), `${workout.title} / ${exercise.name}`).toBeGreaterThan(0);
+          expect(exercise.reps ?? exercise.duration, exercise.name).toBeTruthy();
+          expect(exercise.load, exercise.name).toMatch(/^RPE /);
+          expect(exercise.imageUrl, exercise.name).toMatch(/^\/demos\/musculacao-[a-z0-9-]+\.png$/);
+        }
+      }
+    }
+  });
+
+  it("separa prescrição com tempo de prescrição com repetições", () => {
+    const all = MUSCULACAO_PROGRAM.workouts.flatMap(w => w.sections.flatMap(s => s.exercises));
+    const hang = all.find(e => e.name === "Dead hang")!;
+    expect(hang).toMatchObject({ sets: "3", duration: "30 s", load: "RPE 6" });
+    expect(hang.reps).toBeUndefined();
+    expect(all.find(e => e.name === "Knee-to-wall ankle mobility")).toMatchObject({ sets: "2", reps: "10/lado" });
   });
 });

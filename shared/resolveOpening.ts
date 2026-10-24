@@ -9,7 +9,13 @@
  * UTC quebraria a agenda de quem treina cedo ou tarde, e no horário de verão.
  */
 
-export type OpeningModality = { id: number; name: string; archived?: boolean };
+export type OpeningModality = {
+  id: number;
+  name: string;
+  archived?: boolean;
+  /** Menor = mais prioritária. Desempata dias com mais de uma regra sem horário. */
+  orderIndex?: number;
+};
 
 export type OpeningWorkout = {
   id: number;
@@ -57,6 +63,7 @@ export type ResolutionReason =
   | "nearest_upcoming"
   | "ambiguous_time"
   | "multiple_today"
+  | "prioritized_today"
   | "nothing_scheduled"
   | "user_locked";
 
@@ -143,6 +150,19 @@ function orderModalities(state: OpeningState, prefs: OpeningPrefs): OpeningModal
   });
 }
 
+/**
+ * A regra da modalidade prioritária, se houver exatamente uma. Empate no topo
+ * (ou modalidade sem ordem) devolve null: aí não há prioridade declarada.
+ */
+function prioritizedRule(rules: OpeningRule[], modalities: OpeningModality[]): OpeningRule | null {
+  const rank = (rule: OpeningRule) => modalities.find(m => m.id === rule.modalityId)?.orderIndex;
+  const ranked = rules.map(rule => ({ rule, rank: rank(rule) }));
+  if (ranked.some(item => item.rank === undefined)) return null;
+  const best = Math.min(...ranked.map(item => item.rank!));
+  const top = new Set(ranked.filter(item => item.rank === best).map(item => item.rule.modalityId));
+  return top.size === 1 ? ranked.find(item => item.rank === best)!.rule : null;
+}
+
 export function resolveOpening(now: Date, state: OpeningState, prefs: OpeningPrefs): Resolution {
   const active = state.modalities.filter(m => !m.archived);
 
@@ -201,10 +221,17 @@ export function resolveOpening(now: Date, state: OpeningState, prefs: OpeningPre
   if (todayRules.length > 1) {
     const timed = todayRules.filter(rule => rule.startTime && minutesOfDay(rule.startTime) !== null);
 
-    // 7. Alguma sem horário: não há como desempatar, e chutar seria pior.
-    if (timed.length !== todayRules.length) {
-      return { kind: "picker", candidates: candidatesFrom(todayRules, state), reason: "multiple_today" };
-    }
+    // Sem horário para desempatar, decide a prioridade que o usuário declarou
+    // entre as modalidades; sem prioridade clara, pergunta em vez de chutar.
+    const byPriority = (): Resolution => {
+      const rule = prioritizedRule(todayRules, active);
+      if (!rule) return { kind: "picker", candidates: candidatesFrom(todayRules, state), reason: "multiple_today" };
+      const modality = active.find(m => m.id === rule.modalityId)!;
+      return { kind: "auto", modality, workout: pickWorkoutForModality(state.workouts, modality.id, rule), reason: "prioritized_today" };
+    };
+
+    // 7. Alguma sem horário: a hora não desempata.
+    if (timed.length !== todayRules.length) return byPriority();
 
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
     // A janela é o treino em si mais a tolerância de atraso. A antecedência
@@ -255,7 +282,7 @@ export function resolveOpening(now: Date, state: OpeningState, prefs: OpeningPre
       };
     }
 
-    return { kind: "picker", candidates: candidatesFrom(todayRules, state), reason: "multiple_today" };
+    return byPriority();
   }
 
   // 8. Nada agendado hoje.
@@ -281,6 +308,8 @@ export function describeReason(reason: ResolutionReason, modalityName: string, n
       return "Mais de um treino neste horário";
     case "multiple_today":
       return "Você tem mais de um treino hoje";
+    case "prioritized_today":
+      return `${weekday} — ${modalityName} é sua prioridade`;
     case "nothing_scheduled":
       return "Nada agendado para hoje";
     case "user_locked":
