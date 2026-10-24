@@ -1395,18 +1395,14 @@ function Today({
       )}
       {expandedExerciseData && getExerciseDemo(expandedExerciseData) && (
         <div className={`${demoState.modalClass} app-overlay grid place-items-center bg-[#20231f]/70 p-4`} role="presentation" onClick={() => setExpandedExercise(null)}>
-          <div className="max-h-[80dvh] w-full max-w-sm overflow-y-auto rounded-3xl bg-[#f7f7f2] p-4 shadow-2xl" role="dialog" aria-modal="true" aria-label={`Demonstração de ${expandedExerciseData.name}`} onClick={(event) => event.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#e06b3c]">Demonstração</p>
-                <h3 className="font-display text-xl font-semibold">{expandedExerciseData.name}</h3>
-              </div>
+          <div className="flex max-h-[94dvh] w-full max-w-sm flex-col rounded-3xl bg-[#f7f7f2] p-3 shadow-2xl" role="dialog" aria-modal="true" aria-label={`Demonstração de ${expandedExerciseData.name}`} onClick={(event) => event.stopPropagation()}>
+            <div className="mb-2 flex flex-none items-center justify-between gap-3 pl-1">
+              <h3 className="font-display text-lg font-semibold leading-tight">{expandedExerciseData.name}</h3>
               <Button type="button" variant="ghost" size="icon" aria-label="Fechar demonstração" onClick={() => setExpandedExercise(null)}><X className="h-5 w-5" /></Button>
             </div>
-            <div className="rounded-2xl bg-[#f1f1eb] p-3">
-              <img src={getExerciseDemo(expandedExerciseData)} alt={`Demonstração de ${expandedExerciseData.name}`} className="mx-auto h-56 w-full object-contain" loading="lazy" />
-            </div>
-            <p className="mt-3 text-sm leading-6 text-[#6d746a]">Use a ilustração como referência visual e priorize controle, amplitude confortável e execução segura.</p>
+            {/* A demo é um retrato com início, meio e fim empilhados: a altura que
+                sobra do modal é dela inteira, sem rolagem, cabendo numa tela. */}
+            <img src={getExerciseDemo(expandedExerciseData)} alt={`Demonstração de ${expandedExerciseData.name}`} className="mx-auto min-h-0 w-full flex-1 rounded-2xl object-contain" loading="lazy" />
           </div>
         </div>
       )}

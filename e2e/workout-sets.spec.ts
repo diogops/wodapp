@@ -13,15 +13,15 @@ const strength = {
   sections: [
     {
       id: 90, workoutId: 9, title: "Front squat", format: "5 × 5", kind: "straight_sets", notes: null, orderIndex: 0,
-      exercises: [{ id: 901, sectionId: 90, name: "Front squat", prescription: "5 × 5 · RPE 6, desc. 120 s", sets: "5", reps: "5", duration: null, load: "RPE 6", notes: null, imageUrl: "/demos/musculacao-front-squat.jpg", orderIndex: 0 }],
+      exercises: [{ id: 901, sectionId: 90, name: "Front squat", prescription: "5 × 5 · RPE 6, desc. 120 s", sets: "5", reps: "5", duration: null, load: "RPE 6", notes: null, imageUrl: "/demos/musculacao-front-squat-fases.jpg", orderIndex: 0 }],
     },
     {
       id: 91, workoutId: 9, title: "Bulgarian split squat", format: "3 × 8/lado", kind: "straight_sets", notes: null, orderIndex: 1,
-      exercises: [{ id: 911, sectionId: 91, name: "Bulgarian split squat", prescription: "3 × 8/lado · RPE 3–5, desc. 45 s", sets: "3", reps: "8/lado", duration: null, load: "RPE 3–5", notes: null, imageUrl: "/demos/musculacao-bulgarian-split-squat.jpg", orderIndex: 0 }],
+      exercises: [{ id: 911, sectionId: 91, name: "Bulgarian split squat", prescription: "3 × 8/lado · RPE 3–5, desc. 45 s", sets: "3", reps: "8/lado", duration: null, load: "RPE 3–5", notes: null, imageUrl: "/demos/musculacao-bulgarian-split-squat-fases.jpg", orderIndex: 0 }],
     },
     {
       id: 92, workoutId: 9, title: "Spanish squat isometric", format: "3 × 30 s", kind: "hold", notes: null, orderIndex: 2,
-      exercises: [{ id: 921, sectionId: 92, name: "Spanish squat isometric", prescription: "3 × 30 s · RPE 6, desc. 90 s", sets: "3", reps: null, duration: "30 s", load: "RPE 6", notes: null, imageUrl: "/demos/musculacao-spanish-squat-isometric.jpg", orderIndex: 0 }],
+      exercises: [{ id: 921, sectionId: 92, name: "Spanish squat isometric", prescription: "3 × 30 s · RPE 6, desc. 90 s", sets: "3", reps: null, duration: "30 s", load: "RPE 6", notes: null, imageUrl: "/demos/musculacao-spanish-squat-isometric-fases.jpg", orderIndex: 0 }],
     },
   ],
 };

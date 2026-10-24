@@ -116,7 +116,7 @@ describe("programa de musculação", () => {
           expect(Number(exercise.sets), `${workout.title} / ${exercise.name}`).toBeGreaterThan(0);
           expect(exercise.reps ?? exercise.duration, exercise.name).toBeTruthy();
           expect(exercise.load, exercise.name).toMatch(/^RPE /);
-          expect(exercise.imageUrl, exercise.name).toMatch(/^\/demos\/musculacao-[a-z0-9-]+\.jpg$/);
+          expect(exercise.imageUrl, exercise.name).toMatch(/^\/demos\/musculacao-[a-z0-9-]+-fases\.jpg$/);
         }
       }
     }
