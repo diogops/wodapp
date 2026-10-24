@@ -78,6 +78,13 @@
       "when": 1792861292273,
       "tag": "0010_demos_musculacao_fases",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792885109334,
+      "tag": "0011_musculacao_v2",
+      "breakpoints": true
     }
   ]
 }

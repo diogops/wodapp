@@ -97,7 +97,7 @@ describe("programa de fortalecimento", () => {
 });
 
 describe("programa de musculação", () => {
-  it("tem as 6 semanas do PDF, cada uma com ter/qui/sex e domingo opcional", () => {
+  it("tem 6 semanas, cada uma com ter/qui/sex e domingo opcional", () => {
     expect(MUSCULACAO_PROGRAM.workouts).toHaveLength(24);
     const days = MUSCULACAO_PROGRAM.workouts.map(w => w.title.match(/^S(\d) · (\w{3})/)!.slice(1).join(" "));
     expect(days).toEqual([1, 2, 3, 4, 5, 6].flatMap(week => ["Ter", "Qui", "Sex", "Dom"].map(day => `${week} ${day}`)));
@@ -124,9 +124,16 @@ describe("programa de musculação", () => {
 
   it("separa prescrição com tempo de prescrição com repetições", () => {
     const all = MUSCULACAO_PROGRAM.workouts.flatMap(w => w.sections.flatMap(s => s.exercises));
-    const hang = all.find(e => e.name === "Dead hang")!;
-    expect(hang).toMatchObject({ sets: "3", duration: "30 s", load: "RPE 6" });
-    expect(hang.reps).toBeUndefined();
+    const stretch = all.find(e => e.name === "Front rack stretch")!;
+    expect(stretch).toMatchObject({ sets: "2", duration: "40 s", load: "RPE 3–5" });
+    expect(stretch.reps).toBeUndefined();
     expect(all.find(e => e.name === "Knee-to-wall ankle mobility")).toMatchObject({ sets: "2", reps: "10/lado" });
+  });
+
+  it("troca a variação de acumulação pela de intensificação a partir da S4", () => {
+    const names = (week: number) => MUSCULACAO_PROGRAM.workouts[(week - 1) * 4].sections.flatMap(s => s.exercises.map(e => e.name));
+    expect(names(3)).toContain("Pause front squat");
+    expect(names(4)).toContain("Front squat");
+    expect(names(4)).not.toContain("Pause front squat");
   });
 });
