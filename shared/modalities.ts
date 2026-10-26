@@ -161,14 +161,15 @@ export const BUILT_IN_MODALITIES: ModalitySeed[] = [
     // Programa de fortalecimento para CrossFit (doc/treinos_fortalecimento_crossfit.pdf):
     // olímpicos, ginástica e unilaterais em séries, com aquecimento em camadas
     // (aquecer → mobilizar → ativar) e EMOMs de capacidade. É série/carga/RPE
-    // como musculação, mas com blocos de técnica e EMOM que ela não tem.
+    // como musculação, mas com blocos de técnica e EMOM que ela não tem. Sem
+    // "load": a carga o atleta sobe por conforto, sem campo para registrar.
     slug: "fortalecimento",
     name: "Fortalecimento",
     color: "#5b7a3f",
     icon: "Anvil",
     grammar: {
       allowedBlockKinds: ["warmup", "skill", "straight_sets", "emom", "hold", "cooldown"],
-      trackedMetrics: ["reps", "load", "rpe", "holdSeconds"],
+      trackedMetrics: ["reps", "rpe", "holdSeconds"],
       defaultLoadUnit: "kg",
       restIsFirstClass: true,
       defaultAdvance: "manual",
