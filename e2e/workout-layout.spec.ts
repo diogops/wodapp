@@ -69,6 +69,18 @@ test.describe("tela de treino", () => {
       nodes.map(node => Math.round(node.getBoundingClientRect().left))
     );
     expect(new Set(lefts).size, `posições distintas do botão Ver: ${lefts.join(", ")}`).toBe(1);
+
+    // Feito, cronômetro e Ver não podem se sobrepor nem transbordar o próprio botão.
+    const clashes = await rows.evaluateAll(nodes =>
+      nodes.flatMap(row => {
+        const buttons = [...row.querySelectorAll(":scope > div:first-child button")] as HTMLElement[];
+        const boxes = buttons.map(button => button.getBoundingClientRect());
+        const overlap = boxes.slice(1).some((box, i) => box.left < boxes[i].right - 0.5);
+        const spill = buttons.some(button => button.scrollWidth > button.clientWidth + 1);
+        return overlap || spill ? [row.textContent?.slice(0, 40)] : [];
+      })
+    );
+    expect(clashes, "linhas com botões encavalados").toEqual([]);
   });
 });
 

@@ -16,6 +16,7 @@ export function SetTracker({
   plan,
   suggestedLoad,
   loadHint,
+  trackLoad = true,
   onLogSet,
   onFinish,
 }: {
@@ -24,6 +25,8 @@ export function SetTracker({
   suggestedLoad?: string;
   /** Alvo do programa ("RPE 7", "70% 1RM"): vai de placeholder, não de valor — o campo é de carga. */
   loadHint?: string;
+  /** Modalidade que não registra carga (gramática sem "load") mostra só contador e série. */
+  trackLoad?: boolean;
   onLogSet: (entry: { setIndex: number; load?: string }) => void;
   onFinish: () => void;
 }) {
@@ -42,7 +45,7 @@ export function SetTracker({
   }, [resting]);
 
   const completeSet = () => {
-    onLogSet({ setIndex, load: load.trim() || undefined });
+    onLogSet({ setIndex, load: (trackLoad && load.trim()) || undefined });
     const { nextIndex, finished } = advanceSet(setIndex, plan);
     setSetIndex(nextIndex);
     // Sem descanso depois da última série: o bloco acabou.
@@ -82,6 +85,7 @@ export function SetTracker({
       ) : (
         <>
           {counter}
+          {trackLoad ? (<>
           <Button
             type="button"
             variant="outline"
@@ -110,6 +114,7 @@ export function SetTracker({
           >
             <Plus className="h-3.5 w-3.5" />
           </Button>
+          </>) : <span className="flex-1" />}
           <Button
             className="h-8 shrink-0 bg-[#e06b3c] px-2.5 text-xs text-white hover:bg-[#c8562c]"
             aria-label={`Série ${setIndex + 1} de ${exerciseName} feita`}

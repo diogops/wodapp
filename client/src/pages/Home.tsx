@@ -75,19 +75,14 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { chooseRandomWorkoutIndex } from "@/lib/workoutSelection";
+import { chooseNextWorkoutIndex, chooseRandomWorkoutIndex } from "@/lib/workoutSelection";
 import { getWorkoutDemoState, getWorkoutShellClass, isWorkoutLocked } from "@/lib/workoutMode";
 import { useViewportLock } from "@/lib/viewportLock";
 import {
-  buildAndroidTimerIntent,
   findNextExercise,
   formatTimerDisplay,
   getTimerClickAction,
-  getTimerMode,
-  isAndroid,
-  parseDurationToSeconds,
   type TimerExercise,
-  type TimerMode,
   type TimerStatus,
 } from "@/lib/workoutTimer";
 
@@ -110,36 +105,6 @@ const EXERCISE_DEMOS: Record<string, string> = {
   transição: "/demos/exercise-pvc-transition_0974dc02.png",
   generic: "/demos/exercise-generic-movement_6c9cf380.png",
 };
-
-/**
- * Aviso de fim de timer. Vibração e áudio são independentes de propósito: no
- * celular no bolso a vibração é o que se percebe, e num navegador que bloqueia
- * autoplay o áudio pode simplesmente não sair. Nenhum dos dois pode derrubar
- * o app, então ambos falham em silêncio.
- */
-function signalTimerEnd() {
-  try {
-    navigator.vibrate?.([300, 150, 300, 150, 500]);
-  } catch {}
-  try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    [0, 0.45, 0.9].forEach(offset => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.001, ctx.currentTime + offset);
-      gain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + offset + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.3);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(ctx.currentTime + offset);
-      osc.stop(ctx.currentTime + offset + 0.32);
-    });
-    window.setTimeout(() => ctx.close().catch(() => {}), 1600);
-  } catch {}
-}
 
 /**
  * Botão só de ícone com dica. O rótulo textual vira `aria-label` e tooltip —
@@ -391,6 +356,14 @@ export default function Home() {
   }, [workouts.length, history.length, opening, pendingWorkoutId]);
   const currentIndex = selectedIndex >= 0 && workouts[selectedIndex] && !completedIds.has(workouts[selectedIndex].id) ? selectedIndex : (selectedIndex >= 0 && nextPendingIndex >= 0 ? nextPendingIndex : -1);
   const current = currentIndex >= 0 ? workouts[currentIndex] : undefined;
+  // Campo de carga só onde a gramática da modalidade registra "load".
+  const trackLoad = useMemo(() => {
+    try {
+      return JSON.parse(modalities.find(m => m.id === current?.modalityId)?.grammar ?? "{}").trackedMetrics?.includes("load") ?? true;
+    } catch {
+      return true;
+    }
+  }, [modalities, current?.modalityId]);
   const refresh = () => {
     void utils.workouts.list.invalidate();
     void utils.workouts.history.invalidate();
@@ -400,7 +373,9 @@ export default function Home() {
   const session = trpc.workouts.session.useMutation({
     onSuccess: (_history, variables) => {
       refresh();
-      setSelectedIndex(pickRandomIndex(currentIndex));
+      void utils.schedule.signals.invalidate();
+      const scheduled = new Set((rulesQuery.data ?? []).filter(rule => rule.enabled).map(rule => rule.modalityId));
+      setSelectedIndex(chooseNextWorkoutIndex(workouts, completedIds, currentIndex, scheduled, signalsQuery.data?.lastPerformedAt ?? {}));
       toast.success(variables.action === "completed" ? "Sessão concluída" : "Workout pulado");
     },
   });
@@ -696,6 +671,7 @@ export default function Home() {
               current && session.mutate({ id: current.id, action, durationSeconds })
             }
             loading={workoutsQuery.isLoading || historyQuery.isLoading}
+            trackLoad={trackLoad}
           />
         )}
         {tab === "library" && (
@@ -920,17 +896,23 @@ function Landing() {
   );
 }
 
+// Cronômetro do exercício: `value` é recalculado de `base` + relógio desde
+// `startedAt`, porque com a tela do celular apagada o setInterval para e uma
+// contagem por ticks perderia o tempo da série.
 type ActiveTimer = {
   exerciseId: string;
   label: string;
-  mode: TimerMode;
-  total: number;
+  startedAt: number;
+  base: number;
   value: number;
   status: TimerStatus;
   hidden?: boolean;
 };
 
+const elapsed = (timer: ActiveTimer) => timer.base + Math.floor((Date.now() - timer.startedAt) / 1000);
+
 const DONE_STORAGE_PREFIX = "wodapp:done:";
+const TIMES_STORAGE_PREFIX = "wodapp:times:";
 
 function Today({
   workouts,
@@ -942,10 +924,13 @@ function Today({
   onExit,
   onSession,
   loading,
+  trackLoad,
 }: any) {
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
   const [timer, setTimer] = useState<ActiveTimer | null>(null);
   const [doneExercises, setDoneExercises] = useState<Set<string>>(new Set());
+  // Tempo gasto em cada exercício (do Iniciar ao Concluir), por workout, como os concluídos.
+  const [times, setTimes] = useState<Record<string, number>>({});
   // Cronômetro do WOD inteiro: começa no primeiro "Iniciar" e é o que vai para
   // o histórico. Guardado como timestamp para sobreviver a re-render e à aba
   // ficar em segundo plano, onde setInterval não é confiável.
@@ -959,7 +944,6 @@ function Today({
         (section.exercises ?? []).map((exercise: any) => ({
           id: String(exercise.id),
           name: exercise.name,
-          seconds: parseDurationToSeconds(exercise.duration, exercise.prescription),
         }))
       ),
     [current]
@@ -968,6 +952,7 @@ function Today({
   // Concluídos vivem em localStorage por workout: fechar o app no meio do
   // treino não pode apagar o que já foi feito, e isso não merece uma tabela.
   const doneStorageKey = current ? `${DONE_STORAGE_PREFIX}${current.id}` : null;
+  const timesStorageKey = current ? `${TIMES_STORAGE_PREFIX}${current.id}` : null;
 
   useEffect(() => {
     if (!doneStorageKey) return;
@@ -976,6 +961,11 @@ function Today({
       setDoneExercises(new Set(raw ? (JSON.parse(raw) as string[]) : []));
     } catch {
       setDoneExercises(new Set());
+    }
+    try {
+      setTimes(JSON.parse((timesStorageKey && localStorage.getItem(timesStorageKey)) || "{}"));
+    } catch {
+      setTimes({});
     }
   }, [doneStorageKey]);
 
@@ -1025,53 +1015,34 @@ function Today({
   useEffect(() => {
     if (!timer || timer.status !== "running") return;
     const id = window.setInterval(() => {
-      setTimer(prev => {
-        if (!prev || prev.status !== "running") return prev;
-        if (prev.mode === "stopwatch") return { ...prev, value: prev.value + 1 };
-        const value = prev.value - 1;
-        if (value > 0) return { ...prev, value };
-        signalTimerEnd();
-        return { ...prev, value: 0, status: "finished" };
-      });
+      setTimer(prev => (prev && prev.status === "running" ? { ...prev, value: elapsed(prev) } : prev));
     }, 1000);
     return () => window.clearInterval(id);
   }, [timer?.status, timer?.exerciseId]);
 
-  // Contagem regressiva encerrada marca o exercício sozinha: se o tempo
-  // prescrito acabou, ele foi feito.
+  // Concluir no cronômetro marca o exercício e guarda o tempo gasto.
   useEffect(() => {
-    if (timer?.status === "finished") markDone(timer.exerciseId);
+    if (timer?.status !== "finished") return;
+    markDone(timer.exerciseId);
+    setTimes(prev => {
+      const next = { ...prev, [timer.exerciseId]: timer.value };
+      if (timesStorageKey) {
+        try {
+          localStorage.setItem(timesStorageKey, JSON.stringify(next));
+        } catch {}
+      }
+      return next;
+    });
   }, [timer?.status, timer?.exerciseId]);
 
   const startTimer = (exercise: TimerExercise) => {
-    const mode = getTimerMode(exercise.seconds);
-    const seconds = exercise.seconds ?? 0;
     setWodStartedAt(prev => {
       if (prev !== null) return prev;
       const now = Date.now();
       if (current) markWorkoutStarted(current.id, now);
       return now;
     });
-    const open = () =>
-      setTimer({
-        exerciseId: exercise.id,
-        label: exercise.name,
-        mode,
-        total: seconds,
-        value: mode === "countdown" ? seconds : 0,
-        status: "running",
-      });
-
-    // Só a contagem regressiva faz sentido no relógio do sistema, e só o
-    // Android expõe isso para a web. Cronômetro fica sempre dentro do app.
-    if (mode === "countdown" && isAndroid(navigator.userAgent)) {
-      window.location.href = buildAndroidTimerIntent(seconds, exercise.name);
-      window.setTimeout(() => {
-        if (document.visibilityState === "visible") open();
-      }, 1200);
-      return;
-    }
-    open();
+    setTimer({ exerciseId: exercise.id, label: exercise.name, startedAt: Date.now(), base: 0, value: 0, status: "running" });
   };
 
   const nextExercise = timer ? findNextExercise(flatExercises, timer.exerciseId, doneExercises) : null;
@@ -1092,16 +1063,17 @@ function Today({
     setTimer(prev => {
       if (!prev) return null;
       if (getTimerClickAction(prev.status) === "close") return null;
-      return { ...prev, status: "paused", hidden: true };
+      const value = elapsed(prev);
+      return { ...prev, value, base: value, status: "paused", hidden: true };
     });
   };
 
   const finishCurrent = () => {
-    setTimer(prev => (prev ? { ...prev, status: "finished" } : prev));
+    setTimer(prev => (prev ? { ...prev, value: elapsed(prev), status: "finished" } : prev));
   };
 
   const resumeTimer = () =>
-    setTimer(prev => (prev ? { ...prev, status: "running", hidden: false } : prev));
+    setTimer(prev => (prev ? { ...prev, startedAt: Date.now(), status: "running", hidden: false } : prev));
   // "Sem workout" e "ainda carregando" são estados diferentes. Mostrar o vazio
   // durante o carregamento dizia ao usuário logado que ele não tem treinos.
   if (!current && loading)
@@ -1198,7 +1170,6 @@ function Today({
                   // timer, demonstração); bloco de séries só acrescenta o
                   // registro de séries embaixo dela.
                   const plan = section.kind === "straight_sets" ? parseSetPlan(exercise) : null;
-                  const seconds = parseDurationToSeconds(exercise.duration, exercise.prescription);
                   const done = doneExercises.has(exerciseId);
                   const paused = timer?.exerciseId === exerciseId && timer.status === "paused";
                   return (
@@ -1216,9 +1187,9 @@ function Today({
                               .join(" · ")}
                         </p>
                       </div>
-                      {/* Ações alinhadas numa faixa de largura fixa: sem isso o
-                          "Ver" dançava de linha para linha conforme o texto. */}
-                      <div className="flex shrink-0 items-center justify-end gap-0.5">
+                      {/* Larguras fixas: o "Ver" fica na mesma coluna em toda
+                          linha e nenhum botão transborda sobre o vizinho. */}
+                      <div className="flex shrink-0 items-center justify-end gap-1">
                         <button
                           type="button"
                           aria-label={done ? `Desmarcar ${exercise.name}` : `Marcar ${exercise.name} como feito`}
@@ -1232,37 +1203,23 @@ function Today({
                         >
                           <Check className="h-3.5 w-3.5" />
                         </button>
-                        <Button
+                        <button
                           type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="workout-exercise-timer w-[4.5rem] shrink-0 justify-center px-1 text-xs font-semibold text-[#20231f] hover:bg-[#e9eae2]"
-                          aria-label={`${paused ? "Retomar" : "Iniciar"} timer de ${exercise.name}`}
-                          onClick={() =>
-                            paused
-                              ? resumeTimer()
-                              : startTimer({ id: exerciseId, name: exercise.name, seconds })
-                          }
+                          className="workout-exercise-timer inline-flex h-6 w-12 shrink-0 items-center justify-center rounded-md text-xs font-semibold tabular-nums text-[#20231f] hover:bg-[#e9eae2]"
+                          aria-label={`${paused ? "Retomar" : "Iniciar"} cronômetro de ${exercise.name}`}
+                          onClick={() => (paused ? resumeTimer() : startTimer({ id: exerciseId, name: exercise.name }))}
                         >
-                          <TimerIcon className="mr-1 h-3.5 w-3.5" />
-                          {paused ? "Voltar" : "Iniciar"}
-                        </Button>
-                        <Button
+                          {paused ? formatTimerDisplay(timer.value) : times[exerciseId] != null ? formatTimerDisplay(times[exerciseId]) : <TimerIcon className="h-3.5 w-3.5" />}
+                        </button>
+                        <button
                           type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="workout-exercise-demo w-[2.6rem] shrink-0 justify-center px-1 text-xs text-[#e06b3c] hover:bg-[#f4e4dd]"
-                          aria-expanded={expandedExercise === exerciseId}
+                          className="workout-exercise-demo inline-flex h-6 w-9 shrink-0 items-center justify-center rounded-md text-xs text-[#e06b3c] hover:bg-[#f4e4dd] sm:w-32"
                           aria-label={`Ver demonstração de ${exercise.name}`}
-                          onClick={() => setExpandedExercise(expandedExercise === exerciseId ? null : exerciseId)}
+                          onClick={() => setExpandedExercise(exerciseId)}
                         >
-                          <span className="sm:hidden">
-                            {expandedExercise === exerciseId ? "Ocultar" : "Ver"}
-                          </span>
-                          <span className="hidden sm:inline">
-                            {expandedExercise === exerciseId ? "Ocultar" : "Ver demonstração"}
-                          </span>
-                        </Button>
+                          <span className="sm:hidden">Ver</span>
+                          <span className="hidden sm:inline">Ver demonstração</span>
+                        </button>
                       </div>
                     </div>
                     {plan && (
@@ -1271,6 +1228,7 @@ function Today({
                         plan={plan}
                         suggestedLoad={lastLoads[exercise.name]}
                         loadHint={exercise.load ?? undefined}
+                        trackLoad={trackLoad}
                         onLogSet={entry =>
                           current &&
                           logSet.mutate({
@@ -1342,8 +1300,7 @@ function Today({
             onClick={event => event.stopPropagation()}
           >
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#f29a73]">
-              {timer.status === "finished" ? "Concluído" : timer.label}
-              {timer.mode === "stopwatch" && timer.status !== "finished" ? " · cronômetro" : ""}
+              {timer.status === "finished" ? `${timer.label} · tempo gasto` : timer.label}
             </p>
             <p
               className="font-display text-[22vw] font-semibold leading-none tabular-nums text-white sm:text-[9rem]"
