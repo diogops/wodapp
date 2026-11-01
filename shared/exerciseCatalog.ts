@@ -119,3 +119,26 @@ export const isFocusArea = (name: string) => FOCUS_SET.has(name);
 export function exercisesByCategory(category: ExerciseCategory) {
   return EXERCISE_CATALOG.filter(exercise => exercise.category === category);
 }
+
+/**
+ * Equipamentos da base de exercícios (`server/data/exercises.json`). A chave é
+ * o valor do dataset; o rótulo é o que o atleta vê. Peso corporal entra sempre
+ * no servidor; o chip existe para quem não tem equipamento nenhum.
+ */
+export const EQUIPMENT_OPTIONS = [
+  ["body only", "Só peso corporal"],
+  ["barbell", "Barra"],
+  ["dumbbell", "Halteres"],
+  ["kettlebells", "Kettlebell"],
+  ["cable", "Polia / cabo"],
+  ["machine", "Máquinas"],
+  ["bands", "Elásticos"],
+  ["medicine ball", "Medicine ball"],
+  ["exercise ball", "Bola suíça"],
+  ["e-z curl bar", "Barra W"],
+  ["foam roll", "Rolo de liberação"],
+  ["other", "Outros (barra fixa, banco, caixa…)"],
+] as const;
+
+export type Equipment = (typeof EQUIPMENT_OPTIONS)[number][0];
+export const EQUIPMENT_KEYS = EQUIPMENT_OPTIONS.map(([key]) => key) as [Equipment, ...Equipment[]];

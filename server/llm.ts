@@ -56,6 +56,33 @@ const WORKOUT_JSON_SCHEMA = {
 
 // O prompt do gerador é derivado da gramática da modalidade — ver
 // `shared/generatorPrompt.ts`. Sem modalidade, CrossFit, que é o padrão do app.
+// Workout do dia: cada exercício diz de que item da base veio, para o servidor
+// ligar a demonstração. Vazio = exercício fora da base (ex.: corrida).
+const LIBRARY_WORKOUT_JSON_SCHEMA = {
+  ...WORKOUT_JSON_SCHEMA,
+  properties: {
+    ...WORKOUT_JSON_SCHEMA.properties,
+    sections: {
+      type: "array",
+      items: {
+        ...WORKOUT_JSON_SCHEMA.properties.sections.items,
+        properties: {
+          ...WORKOUT_JSON_SCHEMA.properties.sections.items.properties,
+          exercises: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { ...exerciseProperties, catalogId: { type: "string" } },
+              required: ["name", "prescription", "sets", "reps", "duration", "load", "notes", "catalogId"],
+              additionalProperties: false,
+            },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
 const GENERATOR_SYSTEM_PROMPT = buildGeneratorSystemPrompt();
 
 const SYSTEM_PROMPT = [
@@ -145,6 +172,8 @@ export type GenerateWorkoutInput = {
   changeRequest?: string;
   /** Modalidade alvo. Ausente = CrossFit, o padrão do app. */
   modality?: GeneratorModality;
+  /** Workout do dia: só estes exercícios da base podem entrar. */
+  library?: { id: string; name: string; equipment: string; category: string; level: string; muscles: string[] }[];
 };
 
 /**
@@ -182,6 +211,15 @@ export async function generateWorkout(input: GenerateWorkoutInput): Promise<unkn
     );
   }
 
+  if (input.library?.length) {
+    brief.push(
+      "WORKOUT DO DIA com o equipamento que o atleta tem agora. Use SOMENTE exercícios desta base (id | nome | equipamento | categoria | nível | músculos):",
+      input.library.map(e => `${e.id} | ${e.name} | ${e.equipment} | ${e.category} | ${e.level} | ${e.muscles.join(", ")}`).join("\n"),
+      "Em cada exercício, `catalogId` é o id exato da base e `name` é o nome usado em academia no Brasil (em inglês quando é assim que se fala, ex.: Leg press, Supino reto).",
+      "Programe para evolução muscular: compostos multiarticulares antes de isolados; equilibre empurrar/puxar e cadeia anterior/posterior; prescreva séries, repetições, descanso e esforço alvo (RPE ou RIR) para permitir sobrecarga progressiva; aquecimento específico com os mesmos padrões do treino principal.",
+    );
+  }
+
   brief.push(
     input.exercises.length
       ? `Exercícios que o atleta escolheu: ${input.exercises.join(", ")}.`
@@ -200,7 +238,7 @@ export async function generateWorkout(input: GenerateWorkoutInput): Promise<unkn
     );
   }
   brief.push("Monte o workout no schema solicitado.");
-  return requestWorkout(brief.join("\n"), system);
+  return requestWorkout(brief.join("\n"), system, input.library?.length ? LIBRARY_WORKOUT_JSON_SCHEMA : WORKOUT_JSON_SCHEMA);
 }
 
 /**
@@ -208,13 +246,13 @@ export async function generateWorkout(input: GenerateWorkoutInput): Promise<unkn
  * JSON Schema, então trocar de provedor não muda o contrato — só o custo e a
  * qualidade da programação.
  */
-async function requestWorkout(prompt: string, system = GENERATOR_SYSTEM_PROMPT): Promise<unknown> {
+async function requestWorkout(prompt: string, system = GENERATOR_SYSTEM_PROMPT, schema: object = WORKOUT_JSON_SCHEMA): Promise<unknown> {
   return ENV.workoutLlmProvider === "anthropic"
-    ? requestWorkoutFromAnthropic(prompt, system)
-    : requestWorkoutFromMistral(prompt, system);
+    ? requestWorkoutFromAnthropic(prompt, system, schema)
+    : requestWorkoutFromMistral(prompt, system, schema);
 }
 
-async function requestWorkoutFromMistral(prompt: string, system: string): Promise<unknown> {
+async function requestWorkoutFromMistral(prompt: string, system: string, schema: object): Promise<unknown> {
   let response;
   try {
     response = await getMistralClient().chat.complete({
@@ -222,7 +260,7 @@ async function requestWorkoutFromMistral(prompt: string, system: string): Promis
       maxTokens: 8000,
       responseFormat: {
         type: "json_schema",
-        jsonSchema: { name: "workout", schemaDefinition: WORKOUT_JSON_SCHEMA, strict: true },
+        jsonSchema: { name: "workout", schemaDefinition: schema as Record<string, unknown>, strict: true },
       },
       messages: [
         { role: "system", content: system },
@@ -253,14 +291,14 @@ async function requestWorkoutFromMistral(prompt: string, system: string): Promis
   }
 }
 
-async function requestWorkoutFromAnthropic(prompt: string, system: string): Promise<unknown> {
+async function requestWorkoutFromAnthropic(prompt: string, system: string, schema: object): Promise<unknown> {
   const response = await getClient().messages.create({
     model: ENV.anthropicModel,
     max_tokens: 16000,
     system,
     output_config: {
       effort: "medium",
-      format: { type: "json_schema", schema: WORKOUT_JSON_SCHEMA },
+      format: { type: "json_schema", schema: schema as Record<string, unknown> },
     },
     messages: [{ role: "user", content: prompt }],
   });

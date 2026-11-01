@@ -1,22 +1,26 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  EQUIPMENT_OPTIONS,
   EXERCISE_CATEGORIES,
   FOCUS_AREAS,
+  type Equipment,
   exercisesByCategory,
   type ExerciseCategory,
 } from "@shared/exerciseCatalog";
-import { Loader2, PenLine, Sparkles, X } from "lucide-react";
+import { Dumbbell, Loader2, PenLine, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 
 type Step = "ask" | "pick";
-type PickTab = "exercises" | "focus" | "wishlist";
+type PickTab = "equipment" | "exercises" | "focus" | "wishlist";
 
 export type SurpriseWodSelection = {
   exercises: string[];
   focusAreas: string[];
   notes?: string;
   wishlist?: string;
+  /** Workout do dia: presente = gerar só com a base de exercícios. */
+  equipment?: Equipment[];
 };
 
 function toggle(list: string[], value: string) {
@@ -63,9 +67,10 @@ export function SurpriseWodDialog({
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [wishlist, setWishlist] = useState("");
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [openCategory, setOpenCategory] = useState<ExerciseCategory>(EXERCISE_CATEGORIES[0]);
 
-  const total = exercises.length + focusAreas.length + (wishlist.trim() ? 1 : 0);
+  const total = exercises.length + focusAreas.length + equipment.length + (wishlist.trim() ? 1 : 0);
 
   return (
     <div className="app-overlay fixed inset-0 z-[75] grid place-items-center bg-[#20231f]/70 p-4">
@@ -104,6 +109,17 @@ export function SurpriseWodDialog({
               variant="outline"
               className="w-full justify-start"
               onClick={() => {
+                setTab("equipment");
+                setStep("pick");
+              }}
+            >
+              <Dumbbell className="mr-2 h-4 w-4" />
+              Workout do dia com o que tenho aqui
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => {
                 setTab("wishlist");
                 setStep("pick");
               }}
@@ -130,6 +146,7 @@ export function SurpriseWodDialog({
             <div className="flex gap-1 border-b border-[#dedfd6] px-4 pt-3" role="tablist">
               {(
                 [
+                  ["equipment", "Equipamentos"],
                   ["exercises", "Exercícios"],
                   ["focus", "O que trabalhar"],
                   ["wishlist", "Escrever"],
@@ -152,7 +169,24 @@ export function SurpriseWodDialog({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {tab === "wishlist" ? (
+              {tab === "equipment" ? (
+                <div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {EQUIPMENT_OPTIONS.map(([key, label]) => (
+                      <Chip
+                        key={key}
+                        label={label}
+                        selected={equipment.includes(key)}
+                        onClick={() => setEquipment(prev => toggle(prev, key) as Equipment[])}
+                      />
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-[#6d746a]">
+                    Exercícios com peso corporal sempre entram. A IA monta o treino só com
+                    exercícios da base que usam o que você marcou.
+                  </p>
+                </div>
+              ) : tab === "wishlist" ? (
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6d746a]">
                     Exercícios que você quer neste treino
@@ -232,6 +266,7 @@ export function SurpriseWodDialog({
                     focusAreas,
                     notes: notes.trim() || undefined,
                     wishlist: wishlist.trim() || undefined,
+                    equipment: equipment.length ? equipment : undefined,
                   })
                 }
               >

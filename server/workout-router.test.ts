@@ -88,6 +88,24 @@ describe("workouts procedures", () => {
     ).rejects.toThrow();
   });
 
+  it("generates the workout of the day only from library exercises for the given equipment", async () => {
+    dbMocks.getWorkoutsForUser.mockResolvedValue([]);
+    llmMocks.generateWorkout.mockResolvedValue({ title: "Do dia", focus: "", level: "", notes: "", sections: [{ title: "Força", format: "", notes: "", exercises: [
+      { name: "Supino com halteres", prescription: "", sets: "4", reps: "8", duration: "", load: "", notes: "", catalogId: "Dumbbell_Bench_Press" },
+      { name: "Inventado", prescription: "", sets: "", reps: "", duration: "", load: "", notes: "", catalogId: "../../etc/passwd" },
+    ] }] });
+
+    const result = await appRouter.createCaller(ctx).workouts.generate({ equipment: ["dumbbell"] });
+
+    const library = llmMocks.generateWorkout.mock.calls[0][0].library as { equipment: string }[];
+    expect(library.length).toBeGreaterThan(100);
+    expect(new Set(library.map(exercise => exercise.equipment))).toEqual(new Set(["body only", "dumbbell"]));
+    const [valid, invented] = result.workout.sections[0].exercises;
+    expect(valid.imageUrl).toBe("/exercise-demos/Dumbbell_Bench_Press");
+    // Id que não veio da base não vira URL: a resposta do modelo não é confiável.
+    expect(invented.imageUrl).toBeUndefined();
+  });
+
   it("generates a reviewable workout without persisting it", async () => {
     dbMocks.getWorkoutsForUser.mockResolvedValue([{ ...workout, title: "Workout A" }]);
     llmMocks.generateWorkout.mockResolvedValue({ title: "Gerado", focus: "", level: "", notes: "", sections: [] });

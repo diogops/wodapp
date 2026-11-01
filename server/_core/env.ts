@@ -26,4 +26,7 @@ export const ENV = {
   // Trocar para "anthropic" volta ao Claude sem mexer em código.
   workoutLlmProvider: (process.env.WORKOUT_LLM_PROVIDER ?? "mistral").toLowerCase(),
   mistralChatModel: process.env.MISTRAL_CHAT_MODEL ?? "mistral-medium-latest",
+  // Demonstrações sob demanda dos exercícios da base (server/exerciseLibrary.ts).
+  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
+  geminiImageModel: process.env.GEMINI_IMAGE_MODEL ?? "gemini-3-pro-image",
 };

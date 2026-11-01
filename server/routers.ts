@@ -10,6 +10,8 @@ import { createWorkout, deleteDraft, deleteScheduleRule, deleteWorkout, ensureDe
 import { storagePut } from "./storage";
 import { isCatalogExercise, isFocusArea } from "@shared/exerciseCatalog";
 import { extractWorkoutFromPdf, generateWorkout } from "./llm";
+import { attachLibraryDemos, exercisesForEquipment } from "./exerciseLibrary";
+import { EQUIPMENT_KEYS } from "@shared/exerciseCatalog";
 import { buildWorkoutPdf } from "./workoutPdf";
 
 const exerciseSchema = z.object({ name: z.string(), prescription: z.string().optional(), sets: z.string().optional(), reps: z.string().optional(), duration: z.string().optional(), load: z.string().optional(), notes: z.string().optional(), imageUrl: z.string().max(512).optional() });
@@ -166,9 +168,12 @@ export const appRouter = router({
         // é uso legítimo. O limite existe só para não estourar o contexto.
         wishlist: z.string().max(1500).optional(),
         modalityId: z.number().int().positive().optional(),
+        // Workout do dia: com equipamento informado, o gerador só usa a base.
+        equipment: z.array(z.enum(EQUIPMENT_KEYS)).max(EQUIPMENT_KEYS.length).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const existing = await getWorkoutsForUser(ctx.user.id);
+        const library = input.equipment ? exercisesForEquipment(input.equipment) : undefined;
         // A gramática da modalidade é que define o estilo do treino gerado.
         // Sem modalidade escolhida o gerador cai no CrossFit, que é o padrão.
         const modality = input.modalityId
@@ -181,7 +186,9 @@ export const appRouter = router({
           wishlist: input.wishlist,
           modality: modality ? { name: modality.name, grammar: JSON.parse(modality.grammar) } : undefined,
           avoidTitles: existing.map(workout => workout.title).slice(0, 12),
+          library,
         });
+        if (library) attachLibraryDemos(generated, library);
         // Persistido como rascunho: fechar a aba não pode descartar a proposta.
         let workout;
         try {
@@ -219,6 +226,10 @@ export const appRouter = router({
           avoidTitles: existing.map(workout => workout.title).slice(0, 12),
         });
         const workout = workoutSchema.parse(revised);
+        // O schema do ajuste não traz imagem: sem isto a demonstração do
+        // workout do dia sumiria a cada ajuste.
+        const images = new Map((draft.workout as any)?.sections?.flatMap((section: any) => section.exercises ?? []).filter((exercise: any) => exercise.imageUrl).map((exercise: any) => [exercise.name, exercise.imageUrl]) ?? []);
+        for (const exercise of workout.sections.flatMap(section => section.exercises)) exercise.imageUrl ??= images.get(exercise.name) as string | undefined;
         if (modality) workout.modalityId = modality.id;
         await saveDraft(ctx.user.id, workout);
         return { workout };
