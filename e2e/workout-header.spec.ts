@@ -181,8 +181,8 @@ test.describe("enquadramento fixo no celular", () => {
     expect(overflow, "biblioteca transborda na horizontal").toBe(false);
 
     const buttons = footer.getByRole("button");
-    await expect(buttons).toHaveCount(3);
-    for (const name of [/gerar um wod/i, /criar um workout/i, /importar um workout/i]) {
+    await expect(buttons).toHaveCount(4);
+    for (const name of [/tela de início/i, /gerar um wod/i, /criar um workout/i, /importar um workout/i]) {
       const button = footer.getByRole("button", { name });
       await expect(button).toBeVisible();
       expect((await button.innerText()).trim(), "botão do rodapé com legenda").toBe("");

@@ -58,6 +58,7 @@ import {
   LayoutGrid,
   ListOrdered,
   History as HistoryIcon,
+  House,
   Loader2,
   LogOut,
   Mail,
@@ -790,10 +791,20 @@ export default function Home() {
             não encostarem na barra de gestos nem na barra do navegador, que
             aparece e some conforme a rolagem. */}
         <div className="mx-auto flex max-w-6xl items-center justify-center gap-1.5 px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6">
-            {/* Só ícones, sem rótulo nem dica: os três cabem em qualquer
+            {/* Só ícones, sem rótulo nem dica: os quatro cabem em qualquer
                 largura e o rodapé fica com cara de barra de app. O
                 `aria-label` continua para leitor de tela. */}
             <div className="flex flex-nowrap items-center gap-2">
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="h-11 w-11 rounded-full"
+                aria-label="Ir para a tela de início"
+                onClick={() => setTab("today")}
+              >
+                <House className="h-5 w-5" />
+              </Button>
               <Button
                 type="button"
                 size="icon"

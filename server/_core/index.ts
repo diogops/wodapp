@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerGoogleOAuthRoutes } from "./googleOauth";
 import { registerStorageProxy } from "./storageProxy";
+import { registerExerciseDemos } from "../exerciseLibrary";
 import { appRouter } from "../routers";
 import { runMigrations } from "../db";
 import { createContext } from "./context";
@@ -39,6 +40,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
   registerStorageProxy(app);
+  registerExerciseDemos(app);
   registerOAuthRoutes(app);
   registerGoogleOAuthRoutes(app);
   // tRPC API
