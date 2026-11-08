@@ -73,6 +73,8 @@ export const workouts = pgTable("workouts", {
   orderIndex: integer("orderIndex").notNull().default(0),
   sourceFileKey: varchar("sourceFileKey", { length: 512 }),
   sourceFileName: varchar("sourceFileName", { length: 255 }),
+  // Fora da rotação e do sorteio, mas ainda na Sequência para abrir à mão.
+  archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
 });
@@ -102,6 +104,8 @@ export const workoutExercises = pgTable("workoutExercises", {
   // Ilustração do movimento. Caminho estático servido pelo cliente
   // (`/demos/...`), não uma chave do storage: é asset do app, não upload.
   imageUrl: varchar("imageUrl", { length: 512 }),
+  // Link externo para o vídeo de referência (o router só aceita http/https).
+  videoUrl: varchar("videoUrl", { length: 512 }),
   orderIndex: integer("orderIndex").notNull().default(0),
 });
 
@@ -146,6 +150,8 @@ export const workoutSessions = pgTable("workoutSessions", {
   // Tempo cronometrado do WOD, quando o atleta usou o timer. Nulo quando ele
   // apenas marcou como concluído sem cronometrar.
   durationSeconds: integer("durationSeconds"),
+  rpe: integer("rpe"),
+  notes: text("notes"),
   snapshot: text("snapshot"),
 });
 

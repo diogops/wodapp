@@ -6,6 +6,8 @@ import { workoutSchema } from "../routers";
 import { SEED_PROGRAMS } from "./index";
 import { FORTALECIMENTO_IMAGE_URLS, FORTALECIMENTO_PROGRAM } from "./fortalecimento";
 import { MUSCULACAO_PROGRAM } from "./musculacao";
+import { POWER_CLEAN_PROGRAM } from "./power-clean";
+import { parseSetPlan } from "../../client/src/lib/straightSets";
 
 const PUBLIC_DIR = path.resolve(__dirname, "../../client/public");
 
@@ -93,6 +95,51 @@ describe("programa de fortalecimento", () => {
         }
       }
     }
+  });
+});
+
+describe("programa Power Clean e Mobilidade", () => {
+  const all = POWER_CLEAN_PROGRAM.workouts.flatMap(w => w.sections.flatMap(s => s.exercises));
+
+  it("tem 8 semanas de A, mobilidade e B, em dias alternados e sem prender treino a dia", () => {
+    expect(POWER_CLEAN_PROGRAM.modalitySlug).toBe("fortalecimento");
+    expect(POWER_CLEAN_PROGRAM.scheduleWeekdays).toEqual([1, 3, 6]);
+    expect(POWER_CLEAN_PROGRAM.workouts.every(w => w.weekday === null)).toBe(true);
+    const weeks = [1, 2, 3, 4, 5, 6, 7, 8];
+    expect(POWER_CLEAN_PROGRAM.workouts.map(w => w.title)).toEqual(
+      weeks.flatMap(s => [
+        `Power Clean S${s} · A — Técnica e recepção`,
+        `Power Clean S${s} · Mobilidade complementar`,
+        `Power Clean S${s} · B — Estabilidade e controle`,
+      ])
+    );
+  });
+
+  it("dá imagem própria do app e vídeo a todo exercício", () => {
+    for (const exercise of all) {
+      expect(exercise.imageUrl, exercise.name).toMatch(/^\/demos\/(lpo|musculacao)-[a-z0-9-]+-fases\.jpg$/);
+      expect(exercise.videoUrl, exercise.name).toMatch(/^https:\/\/www\.youtube\.com\//);
+    }
+  });
+
+  it("preserva os três vídeos fornecidos pelo atleta", () => {
+    const videos = all.map(e => e.videoUrl);
+    for (const url of ["https://www.youtube.com/shorts/U-47MQF_TAs", "https://www.youtube.com/watch?v=RknkVzeNYfs", "https://www.youtube.com/shorts/vxlrrQRa8OA"]) {
+      expect(videos).toContain(url);
+    }
+  });
+
+  it("não confunde a pausa do agachamento com o descanso entre séries", () => {
+    const squat = all.find(e => e.name === "Front Squat com pausa")!;
+    expect(squat.prescription).toContain("pausa de 2–3 s");
+    expect(parseSetPlan(squat)?.restSeconds).toBe(120);
+  });
+
+  it("só traz o Power Clean do chão a partir da semana 5", () => {
+    const hasFloor = (week: number) =>
+      POWER_CLEAN_PROGRAM.workouts[(week - 1) * 3].sections.some(s => s.exercises.some(e => e.name === "Power Clean do chão"));
+    expect([1, 2, 3, 4].some(hasFloor)).toBe(false);
+    expect([5, 6, 7, 8].every(hasFloor)).toBe(true);
   });
 });
 

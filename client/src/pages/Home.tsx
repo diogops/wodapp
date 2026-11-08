@@ -12,6 +12,7 @@ import { SurpriseWodDialog } from "@/components/SurpriseWodDialog";
 import { DraftWodPanel } from "@/components/DraftWodPanel";
 import { ScheduleDialog } from "@/components/ScheduleDialog";
 import { SectionTitleSelect } from "@/components/SectionTitleSelect";
+import { SessionReview } from "@/components/SessionReview";
 import { SetTracker } from "@/components/SetTracker";
 import { parseSetPlan } from "@/lib/straightSets";
 import { clearWorkoutStart, findOpenWorkout, markWorkoutStarted, readWorkoutStart } from "@/lib/openingSession";
@@ -63,6 +64,7 @@ import {
   LogOut,
   Mail,
   Pencil,
+  Play,
   Plus,
   Rows3,
   SkipForward,
@@ -76,7 +78,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { chooseNextWorkoutIndex, chooseRandomWorkoutIndex } from "@/lib/workoutSelection";
+import { chooseNextWorkoutIndex, chooseRandomWorkoutIndex, rotationIndex } from "@/lib/workoutSelection";
 import { getWorkoutDemoState, getWorkoutShellClass, isWorkoutLocked } from "@/lib/workoutMode";
 import { useViewportLock } from "@/lib/viewportLock";
 import {
@@ -153,6 +155,9 @@ function getExerciseDemo(exercise: { name: string; imageUrl?: string | null }) {
   const normalized = exercise.name.trim().toLowerCase();
   return Object.entries(EXERCISE_DEMOS).find(([key]) => normalized.includes(key))?.[1] || EXERCISE_DEMOS.generic;
 }
+// As linhas do banco trazem null e o formulário deixa "" nos campos opcionais; o schema só aceita ausência.
+const formSections = (sections: unknown) =>
+  JSON.parse(JSON.stringify(sections ?? [], (_key, value) => (value === null || value === "" ? undefined : value)));
 const dateLabel = (value: Date | string | null | undefined) =>
   value
     ? new Date(value).toLocaleDateString("pt-BR", {
@@ -268,7 +273,7 @@ export default function Home() {
       ),
     [history]
   );
-  const nextPendingIndex = useMemo(() => workouts.findIndex(workout => !completedIds.has(workout.id)), [workouts, completedIds]);
+  const nextPendingIndex = useMemo(() => workouts.findIndex(workout => !workout.archived && !completedIds.has(workout.id)), [workouts, completedIds]);
   const pickRandomIndex = (exclude = -1) => chooseRandomWorkoutIndex(workouts, completedIds, exclude);
 
   // --- Motor de abertura -------------------------------------------------
@@ -304,6 +309,7 @@ export default function Home() {
           id: workout.id,
           modalityId: workout.modalityId,
           title: workout.title,
+          archived: workout.archived,
           lastPerformedAt: signals.lastPerformedAt[workout.id] ?? null,
         })),
         rules: rulesQuery.data ?? [],
@@ -348,23 +354,27 @@ export default function Home() {
     }
   }, [pendingWorkoutId, workouts]);
 
+  const scheduledModalityIds = new Set((rulesQuery.data ?? []).filter(rule => rule.enabled).map(rule => rule.modalityId));
   useEffect(() => {
     // Sorteio só depois que o motor falou: escolher antes faria a tela piscar
     // um treino e trocar por outro.
     if (workouts.length && selectedIndex < 0 && pendingWorkoutId === null && opening) {
-      setSelectedIndex(pickRandomIndex());
+      // Com uma modalidade de agenda escolhida, abre o próximo do programa, não um sorteado.
+      const rotated = rotationIndex(workouts, modalityFilter, scheduledModalityIds, signalsQuery.data?.lastPerformedAt ?? {});
+      setSelectedIndex(rotated >= 0 ? rotated : pickRandomIndex());
     }
   }, [workouts.length, history.length, opening, pendingWorkoutId]);
   const currentIndex = selectedIndex >= 0 && workouts[selectedIndex] && !completedIds.has(workouts[selectedIndex].id) ? selectedIndex : (selectedIndex >= 0 && nextPendingIndex >= 0 ? nextPendingIndex : -1);
   const current = currentIndex >= 0 ? workouts[currentIndex] : undefined;
-  // Campo de carga só onde a gramática da modalidade registra "load".
-  const trackLoad = useMemo(() => {
+  const currentGrammar = useMemo(() => {
     try {
-      return JSON.parse(modalities.find(m => m.id === current?.modalityId)?.grammar ?? "{}").trackedMetrics?.includes("load") ?? true;
+      return JSON.parse(modalities.find(m => m.id === current?.modalityId)?.grammar ?? "{}");
     } catch {
-      return true;
+      return {};
     }
   }, [modalities, current?.modalityId]);
+  // Campo de carga só onde a gramática da modalidade registra "load".
+  const trackLoad = currentGrammar.trackedMetrics?.includes("load") ?? true;
   const refresh = () => {
     void utils.workouts.list.invalidate();
     void utils.workouts.history.invalidate();
@@ -375,8 +385,7 @@ export default function Home() {
     onSuccess: (_history, variables) => {
       refresh();
       void utils.schedule.signals.invalidate();
-      const scheduled = new Set((rulesQuery.data ?? []).filter(rule => rule.enabled).map(rule => rule.modalityId));
-      setSelectedIndex(chooseNextWorkoutIndex(workouts, completedIds, currentIndex, scheduled, signalsQuery.data?.lastPerformedAt ?? {}));
+      setSelectedIndex(chooseNextWorkoutIndex(workouts, completedIds, currentIndex, scheduledModalityIds, signalsQuery.data?.lastPerformedAt ?? {}));
       toast.success(variables.action === "completed" ? "Sessão concluída" : "Workout pulado");
     },
   });
@@ -668,11 +677,12 @@ export default function Home() {
             onNextRandom={() => setSelectedIndex(pickRandomIndex(currentIndex))}
             completedIds={completedIds}
             onExit={() => setTab("library")}
-            onSession={(action: "completed" | "skipped", durationSeconds?: number) =>
-              current && session.mutate({ id: current.id, action, durationSeconds })
+            onSession={(action: "completed" | "skipped", durationSeconds?: number, review?: { rpe?: number; notes?: string }) =>
+              current && session.mutate({ id: current.id, action, durationSeconds, ...review })
             }
             loading={workoutsQuery.isLoading || historyQuery.isLoading}
             trackLoad={trackLoad}
+            sessionReviewHint={currentGrammar.sessionReviewHint}
           />
         )}
         {tab === "library" && (
@@ -780,7 +790,7 @@ export default function Home() {
             busy={create.isPending || update.isPending}
             sectionTitleOptions={sectionTitlesQuery.data ?? []}
             onClose={() => { setShowCreate(false); setEditingWorkout(null); setPendingImport(null); }}
-            onCreate={() => editingWorkout ? update.mutate({ id: editingWorkout.id, data: { title: editingWorkout.title, focus: editingWorkout.focus, level: editingWorkout.level, category: editingWorkout.category || undefined, suggestedDate: editingWorkout.suggestedDate ? new Date(editingWorkout.suggestedDate) : undefined, notes: editingWorkout.notes, sections: editingWorkout.sections || [] } }) : create.mutate({ ...(pendingImport || newWorkout), category: (pendingImport || newWorkout).category || undefined, suggestedDate: (pendingImport || newWorkout).suggestedDate ? new Date((pendingImport || newWorkout).suggestedDate) : undefined, sections: (pendingImport || newWorkout).sections || [], sourceFileKey: pendingImport?.sourceFileKey, sourceFileName: pendingImport?.sourceFileName })}
+            onCreate={() => editingWorkout ? update.mutate({ id: editingWorkout.id, data: { title: editingWorkout.title, focus: editingWorkout.focus, level: editingWorkout.level, category: editingWorkout.category || undefined, suggestedDate: editingWorkout.suggestedDate ? new Date(editingWorkout.suggestedDate) : undefined, notes: editingWorkout.notes, sections: formSections(editingWorkout.sections) } }) : create.mutate({ ...(pendingImport || newWorkout), category: (pendingImport || newWorkout).category || undefined, suggestedDate: (pendingImport || newWorkout).suggestedDate ? new Date((pendingImport || newWorkout).suggestedDate) : undefined, sections: formSections((pendingImport || newWorkout).sections), sourceFileKey: pendingImport?.sourceFileKey, sourceFileName: pendingImport?.sourceFileName })}
           />
         )}
       </main>
@@ -936,7 +946,9 @@ function Today({
   onSession,
   loading,
   trackLoad,
+  sessionReviewHint,
 }: any) {
+  const [reviewing, setReviewing] = useState(false);
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
   const [timer, setTimer] = useState<ActiveTimer | null>(null);
   const [doneExercises, setDoneExercises] = useState<Set<string>>(new Set());
@@ -1272,7 +1284,11 @@ function Today({
             <Button
               className="flex-1 bg-[#e06b3c] text-white hover:bg-[#c8562c]"
               disabled={completedIds.has(current.id)}
-              onClick={() => { clearWorkoutStart(current.id); onSession("completed", wodElapsed ?? undefined); }}
+              onClick={() => {
+                if (sessionReviewHint) return setReviewing(true);
+                clearWorkoutStart(current.id);
+                onSession("completed", wodElapsed ?? undefined);
+              }}
             >
               <Check className="mr-2 h-4 w-4" />
               <span className="sm:hidden">
@@ -1295,6 +1311,17 @@ function Today({
           </div>
         </Card>
       </section>
+      {reviewing && (
+        <SessionReview
+          hint={sessionReviewHint}
+          onCancel={() => setReviewing(false)}
+          onConfirm={review => {
+            setReviewing(false);
+            clearWorkoutStart(current.id);
+            onSession("completed", wodElapsed ?? undefined, review);
+          }}
+        />
+      )}
       {timer && !timer.hidden && (
         // Faixa opaca ocupando metade da tela em vez de um véu translúcido de
         // tela cheia: com 80% de opacidade o treino continuava legível atrás e
@@ -1371,6 +1398,18 @@ function Today({
             {/* A demo é um retrato com início, meio e fim empilhados: a altura que
                 sobra do modal é dela inteira, sem rolagem, cabendo numa tela. */}
             <img src={getExerciseDemo(expandedExerciseData)} alt={`Demonstração de ${expandedExerciseData.name}`} className="mx-auto min-h-0 w-full flex-1 rounded-2xl object-contain" loading="lazy" />
+            {expandedExerciseData.notes && <p className="mt-2 flex-none px-1 text-xs leading-5 text-[#6d746a]">{expandedExerciseData.notes}</p>}
+            {expandedExerciseData.videoUrl && (
+              <a
+                href={expandedExerciseData.videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 flex h-10 flex-none items-center justify-center gap-2 rounded-xl bg-[#e06b3c] text-sm font-semibold text-white hover:bg-[#c8562c]"
+              >
+                <Play className="h-4 w-4" />
+                Ver vídeo
+              </a>
+            )}
           </div>
         </div>
       )}
@@ -1684,6 +1723,8 @@ function History({ items, stats, modalities = [] }: any) {
                 </p>
                 {/* Só aparece quando houve cronômetro: sessão marcada na mão
                     não tem tempo, e inventar um seria pior que omitir. */}
+                {item.session.rpe != null && <p className="mt-0.5 text-xs font-semibold text-[#6d746a]">RPE {item.session.rpe}</p>}
+                {item.session.notes && <p className="mt-0.5 whitespace-pre-wrap text-xs leading-5 text-[#6d746a]">{item.session.notes}</p>}
                 {item.session.durationSeconds != null && (
                   <p className="mt-0.5 flex items-center gap-1 text-xs font-semibold tabular-nums text-[#e06b3c]">
                     <TimerIcon className="h-3 w-3" />
@@ -1704,7 +1745,7 @@ function History({ items, stats, modalities = [] }: any) {
 function CreateWorkout({ value, setValue, busy, onClose, onCreate, sectionTitleOptions = [] }: any) {
   const sections = value.sections || [];
   const setSections = (next: any[]) => setValue({ ...value, sections: next });
-  const invalid = sections.some((section: any) => !section.title?.trim() || (section.exercises || []).some((exercise: any) => !exercise.name?.trim() || (!exercise.prescription?.trim() && !exercise.sets && !exercise.reps && !exercise.duration && !exercise.load)));
+  const invalid = sections.some((section: any) => !section.title?.trim() || (section.exercises || []).some((exercise: any) => (exercise.videoUrl && !/^https?:\/\//i.test(exercise.videoUrl)) || !exercise.name?.trim() || (!exercise.prescription?.trim() && !exercise.sets && !exercise.reps && !exercise.duration && !exercise.load)));
   return (
     <div className="app-overlay fixed inset-0 z-50 grid place-items-end bg-[#20231f]/50 p-0 sm:place-items-center sm:p-6">
       {/* Sem teto de altura o formulário simplesmente saía da tela: com seções e
@@ -1769,7 +1810,7 @@ function CreateWorkout({ value, setValue, busy, onClose, onCreate, sectionTitleO
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between"><Label>Seções e exercícios</Label><Button type="button" variant="outline" size="sm" onClick={() => setSections([...sections, { title: "", format: "", notes: "", exercises: [] }])}><Plus className="mr-1 h-3 w-3" />Seção</Button></div>
-            {sections.map((section: any, sectionIndex: number) => <div key={sectionIndex} className="rounded-xl border border-[#dedfd6] bg-white p-3 space-y-3"><div className="flex gap-2"><div className="min-w-0 flex-1"><SectionTitleSelect value={section.title || ""} options={sectionTitleOptions} onChange={(title: string) => { const next = [...sections]; next[sectionIndex] = { ...section, title }; setSections(next); }} /></div><Button type="button" variant="ghost" size="icon" disabled={sectionIndex === 0} onClick={() => { const next = [...sections]; [next[sectionIndex - 1], next[sectionIndex]] = [next[sectionIndex], next[sectionIndex - 1]]; setSections(next); }}><ArrowUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" disabled={sectionIndex === sections.length - 1} onClick={() => { const next = [...sections]; [next[sectionIndex], next[sectionIndex + 1]] = [next[sectionIndex + 1], next[sectionIndex]]; setSections(next); }}><ArrowDown className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" className="text-[#b14a35]" onClick={() => setSections(sections.filter((_: any, index: number) => index !== sectionIndex))}><Trash2 className="h-4 w-4" /></Button></div><div className="flex gap-2"><Input className="flex-1" value={section.format || ""} onChange={event => { const next = [...sections]; next[sectionIndex] = { ...section, format: event.target.value }; setSections(next); }} placeholder="Formato (ex.: EMOM, AMRAP, força)" /><Select value={section.kind || "auto"} onValueChange={value => { const next = [...sections]; next[sectionIndex] = { ...section, kind: value === "auto" ? null : value }; setSections(next); }}><SelectTrigger className="w-[9.5rem] bg-white" aria-label="Tipo de bloco"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="auto">Automático</SelectItem>{BLOCK_KINDS.map(kind => <SelectItem key={kind} value={kind}>{BLOCK_KIND_LABELS[kind]}</SelectItem>)}</SelectContent></Select></div>{(section.exercises || []).map((exercise: any, exerciseIndex: number) => <div key={exerciseIndex} className="rounded-lg bg-[#f1f1eb] p-3 space-y-2"><div className="flex gap-2"><Input value={exercise.name || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, name: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Exercício" /><Button type="button" variant="ghost" size="icon" disabled={exerciseIndex === 0} onClick={() => { const next = [...sections]; const exercises = [...(section.exercises || [])]; [exercises[exerciseIndex - 1], exercises[exerciseIndex]] = [exercises[exerciseIndex], exercises[exerciseIndex - 1]]; next[sectionIndex] = { ...section, exercises }; setSections(next); }}><ArrowUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" disabled={exerciseIndex === (section.exercises || []).length - 1} onClick={() => { const next = [...sections]; const exercises = [...(section.exercises || [])]; [exercises[exerciseIndex], exercises[exerciseIndex + 1]] = [exercises[exerciseIndex + 1], exercises[exerciseIndex]]; next[sectionIndex] = { ...section, exercises }; setSections(next); }}><ArrowDown className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" onClick={() => { const next = [...sections]; next[sectionIndex] = { ...section, exercises: section.exercises.filter((_: any, index: number) => index !== exerciseIndex) }; setSections(next); }}><Trash2 className="h-4 w-4" /></Button></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[["sets","Séries"],["reps","Reps"],["duration","Tempo"],["load","Carga"]].map(([field, label]) => <Input key={field} value={exercise[field] || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, [field]: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder={label} />)}</div><Input value={exercise.prescription || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, prescription: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Prescrição / observação do exercício" /><Textarea value={exercise.notes || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, notes: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Notas do exercício" /></div>)}<Button type="button" variant="outline" size="sm" onClick={() => { const next = [...sections]; next[sectionIndex] = { ...section, exercises: [...(section.exercises || []), { name: "", prescription: "", sets: "", reps: "", duration: "", load: "", notes: "" }] }; setSections(next); }}><Plus className="mr-1 h-3 w-3" />Exercício</Button><Textarea value={section.notes || ""} onChange={event => { const next = [...sections]; next[sectionIndex] = { ...section, notes: event.target.value }; setSections(next); }} placeholder="Notas da seção" /></div>)}{invalid && <p className="text-xs text-[#b14a35]">Cada seção precisa de nome; cada exercício precisa de nome e prescrição ou ao menos uma métrica (séries, reps, tempo ou carga).</p>}</div>
+            {sections.map((section: any, sectionIndex: number) => <div key={sectionIndex} className="rounded-xl border border-[#dedfd6] bg-white p-3 space-y-3"><div className="flex gap-2"><div className="min-w-0 flex-1"><SectionTitleSelect value={section.title || ""} options={sectionTitleOptions} onChange={(title: string) => { const next = [...sections]; next[sectionIndex] = { ...section, title }; setSections(next); }} /></div><Button type="button" variant="ghost" size="icon" disabled={sectionIndex === 0} onClick={() => { const next = [...sections]; [next[sectionIndex - 1], next[sectionIndex]] = [next[sectionIndex], next[sectionIndex - 1]]; setSections(next); }}><ArrowUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" disabled={sectionIndex === sections.length - 1} onClick={() => { const next = [...sections]; [next[sectionIndex], next[sectionIndex + 1]] = [next[sectionIndex + 1], next[sectionIndex]]; setSections(next); }}><ArrowDown className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" className="text-[#b14a35]" onClick={() => setSections(sections.filter((_: any, index: number) => index !== sectionIndex))}><Trash2 className="h-4 w-4" /></Button></div><div className="flex gap-2"><Input className="flex-1" value={section.format || ""} onChange={event => { const next = [...sections]; next[sectionIndex] = { ...section, format: event.target.value }; setSections(next); }} placeholder="Formato (ex.: EMOM, AMRAP, força)" /><Select value={section.kind || "auto"} onValueChange={value => { const next = [...sections]; next[sectionIndex] = { ...section, kind: value === "auto" ? null : value }; setSections(next); }}><SelectTrigger className="w-[9.5rem] bg-white" aria-label="Tipo de bloco"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="auto">Automático</SelectItem>{BLOCK_KINDS.map(kind => <SelectItem key={kind} value={kind}>{BLOCK_KIND_LABELS[kind]}</SelectItem>)}</SelectContent></Select></div>{(section.exercises || []).map((exercise: any, exerciseIndex: number) => <div key={exerciseIndex} className="rounded-lg bg-[#f1f1eb] p-3 space-y-2"><div className="flex gap-2"><Input value={exercise.name || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, name: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Exercício" /><Button type="button" variant="ghost" size="icon" disabled={exerciseIndex === 0} onClick={() => { const next = [...sections]; const exercises = [...(section.exercises || [])]; [exercises[exerciseIndex - 1], exercises[exerciseIndex]] = [exercises[exerciseIndex], exercises[exerciseIndex - 1]]; next[sectionIndex] = { ...section, exercises }; setSections(next); }}><ArrowUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" disabled={exerciseIndex === (section.exercises || []).length - 1} onClick={() => { const next = [...sections]; const exercises = [...(section.exercises || [])]; [exercises[exerciseIndex], exercises[exerciseIndex + 1]] = [exercises[exerciseIndex + 1], exercises[exerciseIndex]]; next[sectionIndex] = { ...section, exercises }; setSections(next); }}><ArrowDown className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" onClick={() => { const next = [...sections]; next[sectionIndex] = { ...section, exercises: section.exercises.filter((_: any, index: number) => index !== exerciseIndex) }; setSections(next); }}><Trash2 className="h-4 w-4" /></Button></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[["sets","Séries"],["reps","Reps"],["duration","Tempo"],["load","Carga"]].map(([field, label]) => <Input key={field} value={exercise[field] || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, [field]: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder={label} />)}</div><Input value={exercise.prescription || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, prescription: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Prescrição / observação do exercício" /><Input type="url" value={exercise.videoUrl || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, videoUrl: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Link do vídeo (https://...)" aria-label="Link do vídeo" /><Textarea value={exercise.notes || ""} onChange={event => { const next = [...sections]; const exercises = [...(section.exercises || [])]; exercises[exerciseIndex] = { ...exercise, notes: event.target.value }; next[sectionIndex] = { ...section, exercises }; setSections(next); }} placeholder="Notas do exercício" /></div>)}<Button type="button" variant="outline" size="sm" onClick={() => { const next = [...sections]; next[sectionIndex] = { ...section, exercises: [...(section.exercises || []), { name: "", prescription: "", sets: "", reps: "", duration: "", load: "", notes: "" }] }; setSections(next); }}><Plus className="mr-1 h-3 w-3" />Exercício</Button><Textarea value={section.notes || ""} onChange={event => { const next = [...sections]; next[sectionIndex] = { ...section, notes: event.target.value }; setSections(next); }} placeholder="Notas da seção" /></div>)}{invalid && <p className="text-xs text-[#b14a35]">Cada seção precisa de nome; cada exercício precisa de nome e prescrição ou ao menos uma métrica (séries, reps, tempo ou carga); o link do vídeo começa com http:// ou https://.</p>}</div>
           <Button
             className="w-full bg-[#e06b3c] text-white hover:bg-[#c8562c]"
             disabled={!value.title.trim() || busy || invalid}

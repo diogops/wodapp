@@ -229,7 +229,8 @@ export async function ensureProgramWorkouts(userId: number) {
   const db = await getDb();
   const modalitiesBySlug = new Map((await ensureModalities(userId)).map(row => [row.slug, row]));
   const existing = await getWorkoutsForUser(userId);
-  let nextOrder = existing.reduce((max, workout) => Math.max(max, workout.orderIndex + 1), 0);
+  // Arquivados ficam no fim da Sequência: um programa novo entra antes deles.
+  let nextOrder = existing.filter(workout => !workout.archived).reduce((max, workout) => Math.max(max, workout.orderIndex + 1), 0);
   let seeded = false;
   for (const program of SEED_PROGRAMS) {
     const modality = modalitiesBySlug.get(program.modalitySlug);
@@ -254,7 +255,7 @@ export async function ensureProgramWorkouts(userId: number) {
   return seeded ? getWorkoutsForUser(userId) : existing;
 }
 
-export async function createWorkout(data: { userId: number; title: string; focus?: string; level?: string; category?: string; modalityId?: number; suggestedDate?: Date; notes?: string; orderIndex: number; sourceFileKey?: string; sourceFileName?: string; sections: Array<{ title: string; format?: string; kind?: string | null; notes?: string; exercises: Array<{ name: string; prescription?: string; sets?: string; reps?: string; duration?: string; load?: string; notes?: string; imageUrl?: string }> }> }) {
+export async function createWorkout(data: { userId: number; title: string; focus?: string; level?: string; category?: string; modalityId?: number; suggestedDate?: Date; notes?: string; orderIndex: number; sourceFileKey?: string; sourceFileName?: string; archived?: boolean; sections: Array<{ title: string; format?: string; kind?: string | null; notes?: string; exercises: Array<{ name: string; prescription?: string; sets?: string; reps?: string; duration?: string; load?: string; notes?: string; imageUrl?: string; videoUrl?: string }> }> }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const inserted = await db.insert(workouts).values({ ...data, suggestedDate: data.suggestedDate ?? null, category: data.category ?? null, modalityId: data.modalityId ?? null, sourceFileKey: data.sourceFileKey ?? null, sourceFileName: data.sourceFileName ?? null }).returning({ id: workouts.id });
@@ -326,10 +327,11 @@ export async function recordSession(
   workoutId: number,
   action: "completed" | "skipped",
   snapshot: string,
-  durationSeconds?: number
+  durationSeconds?: number,
+  review?: { rpe?: number; notes?: string }
 ) {
   const db = await getDb();
-  await db.insert(workoutSessions).values({ userId, workoutId, action, snapshot, durationSeconds: durationSeconds ?? null });
+  await db.insert(workoutSessions).values({ userId, workoutId, action, snapshot, durationSeconds: durationSeconds ?? null, rpe: review?.rpe ?? null, notes: review?.notes ?? null });
   return getSessionHistory(userId);
 }
 

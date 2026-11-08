@@ -67,8 +67,8 @@ describe("workouts procedures", () => {
     const caller = appRouter.createCaller(ctx);
     await caller.workouts.session({ id: 12, action: "completed" });
     await caller.workouts.session({ id: 12, action: "skipped" });
-    expect(dbMocks.recordSession).toHaveBeenNthCalledWith(1, 7, 12, "completed", JSON.stringify(workout), undefined);
-    expect(dbMocks.recordSession).toHaveBeenNthCalledWith(2, 7, 12, "skipped", JSON.stringify(workout), undefined);
+    expect(dbMocks.recordSession).toHaveBeenNthCalledWith(1, 7, 12, "completed", JSON.stringify(workout), undefined, { rpe: undefined, notes: undefined });
+    expect(dbMocks.recordSession).toHaveBeenNthCalledWith(2, 7, 12, "skipped", JSON.stringify(workout), undefined, { rpe: undefined, notes: undefined });
   });
 
   it("records the stopwatch duration when the athlete timed the workout", async () => {
@@ -77,7 +77,29 @@ describe("workouts procedures", () => {
 
     await appRouter.createCaller(ctx).workouts.session({ id: 12, action: "completed", durationSeconds: 1830 });
 
-    expect(dbMocks.recordSession).toHaveBeenCalledWith(7, 12, "completed", JSON.stringify(workout), 1830);
+    expect(dbMocks.recordSession).toHaveBeenCalledWith(7, 12, "completed", JSON.stringify(workout), 1830, { rpe: undefined, notes: undefined });
+  });
+
+  it("records RPE and notes when the session is reviewed", async () => {
+    dbMocks.getWorkoutForUser.mockResolvedValue(workout);
+    dbMocks.recordSession.mockResolvedValue([]);
+    await appRouter.createCaller(ctx).workouts.session({ id: 12, action: "completed", rpe: 7, notes: " recebi em split " });
+    expect(dbMocks.recordSession).toHaveBeenCalledWith(7, 12, "completed", JSON.stringify(workout), undefined, { rpe: 7, notes: "recebi em split" });
+    await expect(appRouter.createCaller(ctx).workouts.session({ id: 12, action: "completed", rpe: 11 })).rejects.toThrow();
+  });
+
+  it("keeps modality, program and archive state when editing recreates the workout", async () => {
+    dbMocks.getWorkoutForUser.mockResolvedValue({ ...workout, modalityId: 5, sourceFileName: "power-clean-mobilidade-v1", archived: true });
+    dbMocks.createWorkout.mockResolvedValue(workout);
+    await appRouter.createCaller(ctx).workouts.update({ id: 12, data: { title: "Novo", sections: [] } });
+    expect(dbMocks.createWorkout).toHaveBeenCalledWith(expect.objectContaining({ title: "Novo", modalityId: 5, sourceFileName: "power-clean-mobilidade-v1", archived: true }));
+  });
+
+  it("accepts only http(s) video links", async () => {
+    dbMocks.createWorkout.mockResolvedValue(workout);
+    const withVideo = (videoUrl: string) => ({ title: "Força", sections: [{ title: "Técnica", exercises: [{ name: "Clean", videoUrl }] }] });
+    await appRouter.createCaller(ctx).workouts.create(withVideo("https://www.youtube.com/watch?v=x"));
+    await expect(appRouter.createCaller(ctx).workouts.create(withVideo("javascript:alert(1)"))).rejects.toThrow();
   });
 
   it("rejects an absurd duration", async () => {
