@@ -30,7 +30,7 @@ W, H = 900, 1600
 def load_prompts():
     text = PROMPTS.read_text(encoding="utf-8")
     style = re.search(r"## Bloco de estilo.*?```text\n(.*?)```", text, re.S)[1].strip()
-    items = re.findall(r"### \d+\. .*? — `(musculacao-[^`]+-fases\.jpg)`\n```text\n(.*?)```", text, re.S)
+    items = re.findall(r"### \d+\. .*? — `([a-z0-9-]+-fases\.jpg)`\n```text\n(.*?)```", text, re.S)
     assert len(items) >= 33, f"esperava ao menos 33 prompts, achei {len(items)}"
     return style, dict((name, body.strip()) for name, body in items)
 

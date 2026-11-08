@@ -1,6 +1,7 @@
 import type { BlockKind } from "@shared/modalities";
 import { FORTALECIMENTO_PROGRAM } from "./fortalecimento";
 import { MUSCULACAO_PROGRAM } from "./musculacao";
+import { POWER_CLEAN_PROGRAM } from "./power-clean";
 
 /**
  * Programa transcrito de um PDF e semeado por `ensureProgramWorkouts`. É dado,
@@ -17,6 +18,7 @@ export type SeedExercise = {
   notes?: string;
   /** Caminho estático em `client/public` (ex.: `/demos/x.jpg`). */
   imageUrl?: string;
+  videoUrl?: string;
 };
 
 export type SeedSection = {
@@ -51,4 +53,4 @@ export type SeedProgram = {
   workouts: SeedWorkout[];
 };
 
-export const SEED_PROGRAMS: SeedProgram[] = [FORTALECIMENTO_PROGRAM, MUSCULACAO_PROGRAM];
+export const SEED_PROGRAMS: SeedProgram[] = [FORTALECIMENTO_PROGRAM, MUSCULACAO_PROGRAM, POWER_CLEAN_PROGRAM];

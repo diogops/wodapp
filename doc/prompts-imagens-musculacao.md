@@ -1158,3 +1158,120 @@ PHASES, one per panel from top to bottom:
 2. MIDDLE: halfway down, knees bent about 90 degrees.
 3. END: deep bottom, elbows inside the knees, torso upright, heels flat.
 ```
+
+## Programa Power Clean e Mobilidade (`server/programs/power-clean.ts`)
+
+Mesmo bloco de estilo e mesmo gerador. Clean pull, front squat com pausa, front
+rack, punho e tornozelo reutilizam as imagens da musculação.
+
+### 34. Rotação torácica no banco — `lpo-bench-thoracic-rotation-fases.jpg`
+```text
+EXERCISE: Thoracic rotation kneeling beside a flat bench (upper-back ROTATION mobility).
+Camera: three-quarter view from behind and to the athlete's right, slightly high, so the rotation of the upper back is visible.
+Setup: one flat weight bench, no barbell, no plates.
+Body: he kneels on both knees facing the long side of the bench, hips stacked over the knees, the left forearm resting flat on the bench. The right hand touches the back of his head with the right elbow pointing out.
+Must be correct: hips and lower back stay still and square to the bench; only the upper back and shoulders rotate; the supporting forearm never leaves the bench.
+Avoid: standing, lying on the bench, twisting the hips, a barbell, both elbows on the bench.
+PHASES, one per panel from top to bottom:
+1. START: chest square to the bench, right elbow pointing out to the side.
+2. MIDDLE: upper back rotates down, right elbow pointing toward the bench and under the chest.
+3. END: upper back rotates up and open, right elbow pointing at the ceiling, chest facing sideways, hips unchanged.
+```
+
+### 35. Mobilidade torácica no banco, cotovelos apoiados — `lpo-bench-thoracic-extension-fases.jpg`
+```text
+EXERCISE: Kneeling thoracic EXTENSION with both elbows on a bench (no rotation).
+Camera: pure side profile from the athlete's left, so the angle of the upper back and arms is visible.
+Setup: one long flat weight bench seen from the side. Nothing in the hands: no stick, no bar, no plates.
+Body: he kneels on the floor facing the short end of the bench, hips over or behind the knees, both elbows resting on the bench shoulder-width apart, the elbows fully bent and the empty hands touching the back of the shoulders.
+Must be correct: both elbows stay on the bench at all times; the upper back arches, the ribs stay down; there is no twist; the head passes between the arms.
+Avoid: lumbar over-arch, rotation, standing, loaded barbell.
+PHASES, one per panel from top to bottom:
+1. START: kneeling tall with hips over the knees, both elbows on the bench, back neutral.
+2. MIDDLE: hips moving back, chest sinking between the arms.
+3. END: hips behind the knees, chest and head low between the arms, upper back in clear extension, elbows still on the bench.
+```
+
+### 36. Muscle Clean — `lpo-muscle-clean-fases.jpg`
+```text
+EXERCISE: Muscle clean with an empty barbell.
+Camera: pure side profile from the athlete's left, so the bar path and elbows are visible.
+Setup: an Olympic barbell with no plates.
+Body: feet hip-width; the legs do NOT re-bend to receive the bar; the elbows rotate fast around the bar.
+Must be correct: the bar stays close to the torso; both feet stay parallel and do not move forward or back; legs are straight at the finish; the bar rests on the shoulders with elbows forward, fingertips under the bar.
+Avoid: dipping or squatting under the bar, reverse curl with elbows down, split feet, bar far from the body.
+PHASES, one per panel from top to bottom:
+1. START: standing tall on the toes, arms still long and shrugged, bar at the upper thighs.
+2. MIDDLE: elbows high and out, bar at the lower chest and touching the shirt.
+3. END: legs straight, feet flat and parallel, bar on the front of the shoulders, elbows high and forward.
+```
+
+### 37. Tall Power Clean — `lpo-tall-power-clean-fases.jpg`
+```text
+EXERCISE: Tall power clean drill with an empty barbell.
+Camera: three-quarter front view from the athlete's front-left, so both feet and elbows are visible and clearly symmetrical.
+Setup: an Olympic barbell with no plates.
+Body: he starts tall, with no hip hinge and no countermovement, then pulls himself under the bar and receives it.
+Must be correct: the receiving feet are PARALLEL and level with each other, slightly wider than the hips, flat on the floor; neither foot in front of the other; knees softly bent in a partial quarter squat; elbows high and forward.
+Avoid: a split stance, one foot forward, a deep squat, a jump far off the floor, a hip hinge at the start.
+PHASES, one per panel from top to bottom:
+1. START: fully tall on flat feet, hips and knees straight, arms long, bar at the hips.
+2. MIDDLE: bar rising close to the body at the waist, elbows high and out, feet just off the floor moving outward together.
+3. END: feet landed flat, parallel and symmetrical in a partial squat, bar on the shoulders, elbows forward.
+```
+
+### 38. Hang Power Clean acima do joelho — `lpo-hang-power-clean-fases.jpg`
+```text
+EXERCISE: Hang power clean from just above the knee.
+Camera: three-quarter front view from the athlete's front-left, so both feet are visible and the bar height against the leg is clear.
+Setup: an Olympic barbell with one medium black bumper plate on each side. The bar never touches the floor.
+Body: flat back, arms long until the bar passes the hips.
+Must be correct: hang position with the bar just ABOVE the kneecaps, hips back, flat back, straight arms; receiving with feet PARALLEL and level; partial squat, elbows high and forward.
+Avoid: a bar on the floor, a bar below the knee, a split stance, one foot forward, a full squat, a reverse curl.
+PHASES, one per panel from top to bottom:
+1. START: hang position, torso leaning forward, hips back, bar just above the knees, straight arms.
+2. MIDDLE: full triple extension on the toes, bar at the upper thighs, shoulders shrugged, arms long.
+3. END: feet flat, parallel and symmetrical in a partial squat, bar on the shoulders, elbows forward.
+```
+
+### 39. Power Clean do chão — `lpo-power-clean-fases.jpg`
+```text
+EXERCISE: Power clean from the floor.
+Camera: three-quarter front view from the athlete's front-left, so both feet and the bar are visible.
+Setup: an Olympic barbell with one large black bumper plate on each side.
+Body: flat back, arms long until the bar passes the hips.
+Must be correct: start with bar over the mid-foot and flat back; bar stays close to the body; receive with feet PARALLEL and level, in a partial squat with thighs above horizontal; elbows high and forward.
+Avoid: a split stance, one foot forward, a full squat, a rounded back, a reverse curl.
+PHASES, one per panel from top to bottom:
+1. START: bar on the floor over the mid-foot, hips above the knees, flat back, straight arms.
+2. MIDDLE: full triple extension on the toes, bar at the upper thighs, shoulders shrugged, arms long.
+3. END: feet flat, parallel and symmetrical in a partial squat, bar on the shoulders, elbows forward.
+```
+
+### 40. Split Stance Front Rack Hold — `lpo-split-stance-front-rack-hold-fases.jpg`
+```text
+EXERCISE: Split stance front rack isometric hold with a light barbell.
+Camera: pure side profile from the athlete's left, so the split stance and the bar on the shoulders are visible.
+Setup: an Olympic barbell with no plates, held in front rack on the front of the shoulders. One continuous dark teal background: NO boxes, NO frames, NO white borders around the panels.
+Body: one foot forward and flat, the shin close to vertical; the other foot behind on the ball of the foot; both knees softly bent; torso vertical; elbows high and forward; fingertips under the bar.
+Must be correct: an upright, stable hold; the bar stays on the shoulders in every panel; the feet stay clearly SPLIT, one in front and one behind, in ALL three panels.
+Avoid: feet side by side, bar on the back, overhead bar, leaning forward, a deep lunge with a knee on the floor, framed panels.
+PHASES, one per panel from top to bottom:
+1. START: standing tall in a split stance, left foot forward, bar in front rack.
+2. MIDDLE: hold: both knees slightly bent, torso vertical, elbows high.
+3. END: same hold with the RIGHT foot forward, showing the other side.
+```
+
+### 41. Alongamento de tríceps e dorsais — `lpo-triceps-lat-stretch-fases.jpg`
+```text
+EXERCISE: Standing overhead triceps and lat stretch against a rack upright, no weights.
+Camera: pure side view from the athlete's left, so the raised left arm, the bent elbow and the long side of the torso are visible, with his face in profile.
+Setup: one vertical rack upright beside him. No barbell, no plates, no other equipment.
+Body: feet hip-width, torso upright. The left arm is raised overhead with the elbow fully bent so the left hand reaches down between the shoulder blades, and the left elbow leans against the upright. The right arm hangs straight down, with the right hand relaxed beside the right thigh and never touching the torso.
+Must be correct: elbow pointing up at the ceiling; ribs down; a long side of the torso; no weight in the hands.
+Avoid: back view, a hand on the chest or back, straight raised arm, a barbell, a heavy back arch, arm pulled across the chest.
+PHASES, one per panel from top to bottom:
+1. START: standing beside the upright, left arm rising overhead.
+2. MIDDLE: left elbow bent and pointing up against the upright, hand between the shoulder blades.
+3. END: torso leaning gently away and hips moving out, a visible long stretch along the left side of the torso.
+```

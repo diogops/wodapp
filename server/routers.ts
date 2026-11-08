@@ -14,7 +14,7 @@ import { attachLibraryDemos, exercisesForEquipment } from "./exerciseLibrary";
 import { EQUIPMENT_KEYS } from "@shared/exerciseCatalog";
 import { buildWorkoutPdf } from "./workoutPdf";
 
-const exerciseSchema = z.object({ name: z.string(), prescription: z.string().optional(), sets: z.string().optional(), reps: z.string().optional(), duration: z.string().optional(), load: z.string().optional(), notes: z.string().optional(), imageUrl: z.string().max(512).optional() });
+const exerciseSchema = z.object({ name: z.string(), prescription: z.string().optional(), sets: z.string().optional(), reps: z.string().optional(), duration: z.string().optional(), load: z.string().optional(), notes: z.string().optional(), imageUrl: z.string().max(512).optional(), videoUrl: z.string().max(512).regex(/^https?:\/\//i, "O link do vídeo precisa começar com http:// ou https://").optional() });
 const categorySchema = z.string().refine(isWorkoutCategory, "categoria inválida");
 const sectionSchema = z.object({ title: z.string(), format: z.string().optional(), kind: z.string().refine(isBlockKind).nullish(), notes: z.string().optional(), exercises: z.array(exerciseSchema).default([]) });
 export const workoutSchema = z.object({ title: z.string().min(1), modalityId: z.number().int().positive().optional(), focus: z.string().optional(), level: z.string().optional(), category: categorySchema.optional(), suggestedDate: z.coerce.date().optional(), notes: z.string().optional(), sections: z.array(sectionSchema).default([]), sourceFileKey: z.string().optional(), sourceFileName: z.string().optional() });
@@ -121,7 +121,8 @@ export const appRouter = router({
     update: protectedProcedure.input(z.object({ id: z.number(), data: workoutSchema })).mutation(async ({ ctx, input }) => {
       const existing = await getWorkoutForUser(ctx.user.id, input.id);
       if (!existing) throw new Error("Workout não encontrado");
-      const created = await createWorkout({ ...input.data, userId: ctx.user.id, orderIndex: existing.orderIndex });
+      // Recria o workout: o que o formulário não envia precisa vir do original, senão ele sai do programa e da modalidade.
+      const created = await createWorkout({ ...input.data, modalityId: input.data.modalityId ?? existing.modalityId ?? undefined, sourceFileName: input.data.sourceFileName ?? existing.sourceFileName ?? undefined, sourceFileKey: input.data.sourceFileKey ?? existing.sourceFileKey ?? undefined, archived: existing.archived, userId: ctx.user.id, orderIndex: existing.orderIndex });
       await deleteWorkout(ctx.user.id, input.id);
       return created;
     }),
@@ -151,11 +152,13 @@ export const appRouter = router({
         // Teto de 24h: um cronômetro esquecido aberto não pode virar um
         // registro absurdo no histórico.
         durationSeconds: z.number().int().min(0).max(86_400).optional(),
+        rpe: z.number().int().min(1).max(10).optional(),
+        notes: z.string().trim().max(2000).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const workout = await getWorkoutForUser(ctx.user.id, input.id);
         if (!workout) throw new Error("Workout não encontrado");
-        return recordSession(ctx.user.id, input.id, input.action, JSON.stringify(workout), input.durationSeconds);
+        return recordSession(ctx.user.id, input.id, input.action, JSON.stringify(workout), input.durationSeconds, { rpe: input.rpe, notes: input.notes });
       }),
     generate: protectedProcedure
       .input(z.object({

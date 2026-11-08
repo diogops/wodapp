@@ -49,6 +49,8 @@ export type ModalityGrammar = {
   restIsFirstClass: boolean;
   /** O sequenciador avança sozinho ou espera confirmação? */
   defaultAdvance: "auto" | "manual";
+  /** Preenchido: ao concluir, pede RPE e observações; o texto é a dica do campo. */
+  sessionReviewHint?: string;
   /** Vocabulário da tela, para a UI não dizer "WOD" em musculação. */
   labels: {
     workout: string;
@@ -161,18 +163,19 @@ export const BUILT_IN_MODALITIES: ModalitySeed[] = [
     // Programa de fortalecimento para CrossFit (doc/treinos_fortalecimento_crossfit.pdf):
     // olímpicos, ginástica e unilaterais em séries, com aquecimento em camadas
     // (aquecer → mobilizar → ativar) e EMOMs de capacidade. É série/carga/RPE
-    // como musculação, mas com blocos de técnica e EMOM que ela não tem. Sem
-    // "load": a carga o atleta sobe por conforto, sem campo para registrar.
+    // como musculação, mas com blocos de técnica e EMOM que ela não tem. A
+    // correção do Power Clean pede o registro de carga, RPE e observações.
     slug: "fortalecimento",
     name: "Fortalecimento",
     color: "#5b7a3f",
     icon: "Anvil",
     grammar: {
       allowedBlockKinds: ["warmup", "skill", "straight_sets", "emom", "hold", "cooldown"],
-      trackedMetrics: ["reps", "rpe", "holdSeconds"],
+      trackedMetrics: ["reps", "load", "rpe", "holdSeconds"],
       defaultLoadUnit: "kg",
       restIsFirstClass: true,
       defaultAdvance: "manual",
+      sessionReviewHint: "Recepção com os pés paralelos? Perdeu o equilíbrio? Dor ou dificuldade técnica?",
       labels: { workout: "Treino", block: "Bloco", unitOfWork: "Série" },
     },
   },

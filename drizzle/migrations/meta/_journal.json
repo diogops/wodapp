@@ -92,6 +92,13 @@
       "when": 1792946949252,
       "tag": "0012_fortalecimento_sem_carga",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794159173699,
+      "tag": "0013_power_clean_mobilidade",
+      "breakpoints": true
     }
   ]
 }
